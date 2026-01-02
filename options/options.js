@@ -16,6 +16,7 @@ async function loadSettings() {
   const settings = response || {};
   
   document.getElementById('apiKey').value = settings.groqApiKey || '';
+  document.getElementById('githubToken').value = settings.githubToken || '';
   document.getElementById('historyRetention').value = settings.historyRetentionDays || 90;
 }
 
@@ -86,6 +87,12 @@ function setupEventListeners() {
   // Toggle API key visibility
   document.getElementById('toggleApiKey').addEventListener('click', () => {
     const input = document.getElementById('apiKey');
+    input.type = input.type === 'password' ? 'text' : 'password';
+  });
+
+  // Toggle GitHub token visibility
+  document.getElementById('toggleGithubToken').addEventListener('click', () => {
+    const input = document.getElementById('githubToken');
     input.type = input.type === 'password' ? 'text' : 'password';
   });
 
@@ -386,8 +393,11 @@ function clearResume() {
 
 async function refreshCache() {
   const button = document.getElementById('refreshCache');
+  const errorEl = document.getElementById('cacheError');
+  
   button.disabled = true;
   button.textContent = 'Refreshing...';
+  errorEl.style.display = 'none';
 
   try {
     const response = await browser.runtime.sendMessage({ action: 'refreshCache' });
@@ -396,10 +406,15 @@ async function refreshCache() {
       showStatus(response.message);
       await updateCacheStatus();
     } else {
+      errorEl.textContent = response.error;
+      errorEl.style.display = 'block';
       showStatus(response.error, true);
     }
   } catch (error) {
-    showStatus(`Refresh failed: ${error.message}`, true);
+    const errorMsg = `Refresh failed: ${error.message}`;
+    errorEl.textContent = errorMsg;
+    errorEl.style.display = 'block';
+    showStatus(errorMsg, true);
   } finally {
     button.disabled = false;
     button.textContent = 'Refresh Now';
@@ -454,11 +469,17 @@ async function saveAllSettings() {
   button.textContent = 'Saving...';
 
   try {
+    // Get current profile to check if GitHub username changed
+    const existingProfile = await browser.runtime.sendMessage({ action: 'getProfile' });
+    const oldGithubUsername = existingProfile?.githubUsername;
+    const newGithubUsername = document.getElementById('githubUsername').value.trim();
+    
     // Save settings
     await browser.runtime.sendMessage({
       action: 'saveSettings',
       data: {
         groqApiKey: document.getElementById('apiKey').value.trim(),
+        githubToken: document.getElementById('githubToken').value.trim(),
         historyRetentionDays: parseInt(document.getElementById('historyRetention').value)
       }
     });
@@ -473,7 +494,7 @@ async function saveAllSettings() {
       email: document.getElementById('email').value.trim(),
       phone: document.getElementById('phone').value.trim(),
       // Profile links
-      githubUsername: document.getElementById('githubUsername').value.trim(),
+      githubUsername: newGithubUsername,
       linkedinUrl: document.getElementById('linkedinUrl').value.trim(),
       twitterUrl: document.getElementById('twitterUrl').value.trim(),
       portfolioUrl: document.getElementById('portfolioUrl').value.trim(),
@@ -487,7 +508,6 @@ async function saveAllSettings() {
 
     // Preserve existing resume if not changed
     if (!profile.resumeText) {
-      const existingProfile = await browser.runtime.sendMessage({ action: 'getProfile' });
       if (existingProfile && existingProfile.resumeText) {
         profile.resumeText = existingProfile.resumeText;
         profile.resumeFileName = existingProfile.resumeFileName;
@@ -500,6 +520,15 @@ async function saveAllSettings() {
     });
 
     showStatus('Settings saved');
+    
+    // Auto-refresh cache if GitHub username changed or is newly set
+    if (newGithubUsername && newGithubUsername !== oldGithubUsername) {
+      showStatus('Settings saved. Refreshing GitHub cache...');
+      await new Promise(resolve => setTimeout(resolve, 500));
+      await refreshCache();
+    } else {
+      await updateCacheStatus();
+    }
   } catch (error) {
     showStatus(`Failed to save: ${error.message}`, true);
   } finally {

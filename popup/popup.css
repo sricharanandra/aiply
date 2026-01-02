@@ -323,6 +323,11 @@ textarea::placeholder {
   color: #4aff4a;
 }
 
+.btn-copy:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .output {
   padding: 12px;
   font-size: 13px;
@@ -371,49 +376,42 @@ textarea::placeholder {
   border: 1px solid #2a2a2a;
   border-radius: 8px;
   margin-bottom: 16px;
-}
-
-.scrape-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 8px;
-}
-
-.scrape-info {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.platform-badge {
-  display: inline-block;
-  padding: 4px 8px;
-  font-size: 11px;
-  font-weight: 500;
-  background: #2a2a2a;
-  border-radius: 4px;
-  color: #888;
-}
-
-.platform-badge.detected {
-  background: #1a3a2a;
-  color: #4aff8a;
-}
-
-.page-status {
-  font-size: 11px;
-  color: #666;
+  text-align: center;
 }
 
 .scrape-hint {
-  font-size: 11px;
-  color: #666;
-  margin: 0;
+  font-size: 12px;
+  color: #888;
+  margin: 0 0 12px 0;
+  line-height: 1.5;
 }
 
-.btn-scrape {
-  padding: 8px 14px;
+.btn-analyze {
+  width: 100%;
+  padding: 14px 16px;
+  font-size: 14px;
+}
+
+/* Page Info Section */
+.page-info-section {
+  margin-bottom: 16px;
+  padding: 12px;
+  background: #1a1a1a;
+  border: 1px solid #2a2a2a;
+  border-radius: 8px;
+}
+
+.page-info-header {
+  display: flex;
+  align-items: center;
+}
+
+.page-title {
+  font-size: 13px;
+  color: #aaa;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* Job Info Section */
@@ -540,6 +538,11 @@ textarea::placeholder {
   white-space: pre-wrap;
 }
 
+.question-answer.no-answer {
+  color: #666;
+  font-style: italic;
+}
+
 .question-actions {
   display: flex;
   gap: 8px;
@@ -587,6 +590,12 @@ textarea::placeholder {
   margin-bottom: 0;
   font-size: 13px;
   color: #aaa;
+}
+
+.profile-fields-hint {
+  font-size: 11px;
+  color: #666;
+  margin: 0 0 10px 0;
 }
 
 .profile-fields-list {

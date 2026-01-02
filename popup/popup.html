@@ -109,51 +109,28 @@
       </div>
     </main>
 
-    <!-- Application Mode (new functionality) -->
+    <!-- Application Mode (new universal functionality) -->
     <main id="applicationMode" class="mode-content" style="display: none;">
-      <!-- Scrape Controls -->
+      <!-- Analyze Controls -->
       <div class="scrape-section">
-        <div class="scrape-header">
-          <div class="scrape-info">
-            <span id="platformName" class="platform-badge">Not detected</span>
-            <span id="pageStatus" class="page-status"></span>
-          </div>
-          <button id="scrapeBtn" class="btn-secondary btn-scrape">
-            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
-              <path d="M11.534 7h3.932a.25.25 0 0 1 .192.41l-1.966 2.36a.25.25 0 0 1-.384 0l-1.966-2.36a.25.25 0 0 1 .192-.41zm-11 2h3.932a.25.25 0 0 0 .192-.41L2.692 6.23a.25.25 0 0 0-.384 0L.342 8.59A.25.25 0 0 0 .534 9z"/>
-              <path fill-rule="evenodd" d="M8 3c-1.552 0-2.94.707-3.857 1.818a.5.5 0 1 1-.771-.636A6.002 6.002 0 0 1 13.917 7H12.9A5.002 5.002 0 0 0 8 3zM3.1 9a5.002 5.002 0 0 0 8.757 2.182.5.5 0 1 1 .771.636A6.002 6.002 0 0 1 2.083 9H3.1z"/>
-            </svg>
-            <span>Scrape Page</span>
-          </button>
-        </div>
-        <p class="scrape-hint">Navigate to a job application page and click "Scrape Page" to extract questions.</p>
+        <p class="scrape-hint">Navigate to any job application page and click "Analyze Page" to extract questions and generate answers.</p>
+        <button id="analyzeBtn" class="btn-primary btn-analyze">
+          <span class="btn-text">Analyze Page</span>
+          <span class="btn-loading" style="display: none;">Analyzing...</span>
+        </button>
       </div>
 
-      <!-- Scraped Job Info -->
-      <div id="jobInfoSection" class="job-info-section" style="display: none;">
-        <div class="job-info-header">
-          <h3 id="scrapedCompany">Company Name</h3>
-          <span id="scrapedRole" class="job-role">Role Title</span>
-        </div>
-        <div class="field collapsible">
-          <button type="button" class="collapse-toggle" id="toggleScrapedJD">
-            Job Description
-            <span class="toggle-icon">+</span>
-          </button>
-          <div class="collapse-content" id="scrapedJDContent" style="display: none;">
-            <div id="scrapedJD" class="scraped-jd"></div>
-          </div>
+      <!-- Page Info (shown after analysis) -->
+      <div id="pageInfoSection" class="page-info-section" style="display: none;">
+        <div class="page-info-header">
+          <span id="pageTitle" class="page-title">Page Title</span>
         </div>
       </div>
 
-      <!-- Questions List -->
+      <!-- Questions & Answers List -->
       <div id="questionsSection" class="questions-section" style="display: none;">
         <div class="questions-header">
-          <label>Questions (<span id="questionCount">0</span>)</label>
-          <button id="generateAllBtn" class="btn-secondary btn-generate-all">
-            <span class="btn-text">Generate All</span>
-            <span class="btn-loading" style="display: none;">Generating...</span>
-          </button>
+          <label>Questions & Answers (<span id="questionCount">0</span>)</label>
         </div>
         <div id="questionsList" class="questions-list"></div>
       </div>
@@ -164,6 +141,7 @@
           <label>Profile Fields (<span id="profileFieldCount">0</span>)</label>
           <button id="fillProfileBtn" class="btn-secondary">Fill All</button>
         </div>
+        <p class="profile-fields-hint">These fields can be auto-filled from your profile.</p>
         <div id="profileFieldsList" class="profile-fields-list"></div>
       </div>
 

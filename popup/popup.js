@@ -19,9 +19,6 @@ async function init() {
   await restoreMode();
   await restoreDraft();
   setupEventListeners();
-  
-  // Detect platform for application mode
-  detectPlatform();
 }
 
 async function checkConfiguration() {
@@ -61,11 +58,6 @@ function switchMode(mode, save = true) {
   
   if (save) {
     saveMode(mode);
-  }
-  
-  // Refresh platform detection when switching to application mode
-  if (mode === 'application') {
-    detectPlatform();
   }
 }
 
@@ -206,16 +198,8 @@ function setupEventListeners() {
 
   // === Application Mode Listeners ===
   
-  // Scrape button
-  document.getElementById('scrapeBtn').addEventListener('click', scrapePage);
-  
-  // Toggle scraped JD
-  document.getElementById('toggleScrapedJD').addEventListener('click', () => {
-    toggleCollapsible('toggleScrapedJD', 'scrapedJDContent');
-  });
-  
-  // Generate all button
-  document.getElementById('generateAllBtn').addEventListener('click', generateAllAnswers);
+  // Analyze button
+  document.getElementById('analyzeBtn').addEventListener('click', analyzePage);
   
   // Fill profile fields button
   document.getElementById('fillProfileBtn').addEventListener('click', fillAllProfileFields);
@@ -347,54 +331,23 @@ async function copyOutput() {
 
 // === Application Mode Functions ===
 
-// Store scraped data
-let scrapedData = null;
+// Store analyzed data
+let analyzedData = null;
 
-async function detectPlatform() {
-  try {
-    const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
-    if (!tab || !tab.url) {
-      updatePlatformStatus('Not detected', false);
-      return;
-    }
-    
-    const url = tab.url;
-    const platformName = getPlatformName(url);
-    
-    if (platformName) {
-      updatePlatformStatus(platformName, true);
-    } else {
-      updatePlatformStatus('Unknown site', false);
-      document.querySelector('.scrape-hint').textContent = 
-        'This site may not be fully supported. Scraping will use best-effort extraction.';
-    }
-  } catch (error) {
-    updatePlatformStatus('Error', false);
-  }
-}
-
-function getPlatformName(url) {
-  if (url.includes('docs.google.com/forms')) return 'Google Forms';
-  if (url.includes('greenhouse.io') || url.includes('boards.greenhouse.io')) return 'Greenhouse';
-  if (url.includes('glassdoor.com') || url.includes('glassdoor.co.in')) return 'Glassdoor';
-  if (url.includes('linkedin.com/jobs')) return 'LinkedIn';
-  if (url.includes('internshala.com')) return 'Internshala';
-  return null;
-}
-
-function updatePlatformStatus(name, detected) {
-  const badge = document.getElementById('platformName');
-  badge.textContent = name;
-  badge.classList.toggle('detected', detected);
-}
-
-async function scrapePage() {
-  const button = document.getElementById('scrapeBtn');
-  const originalText = button.querySelector('span').textContent;
+async function analyzePage() {
+  const button = document.getElementById('analyzeBtn');
+  const btnText = button.querySelector('.btn-text');
+  const btnLoading = button.querySelector('.btn-loading');
   
   button.disabled = true;
-  button.querySelector('span').textContent = 'Scraping...';
+  btnText.style.display = 'none';
+  btnLoading.style.display = 'inline';
   hideAppError();
+  
+  // Reset previous results
+  document.getElementById('pageInfoSection').style.display = 'none';
+  document.getElementById('questionsSection').style.display = 'none';
+  document.getElementById('profileFieldsSection').style.display = 'none';
   
   try {
     const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
@@ -403,51 +356,75 @@ async function scrapePage() {
       throw new Error('No active tab found');
     }
     
-    // Send message to content script
-    const response = await browser.tabs.sendMessage(tab.id, { action: 'scrape' });
+    // Step 1: Scrape page content
+    btnLoading.textContent = 'Scraping page...';
+    const scrapeResponse = await browser.tabs.sendMessage(tab.id, { action: 'scrape' });
     
-    if (response.success) {
-      scrapedData = response.data;
-      displayScrapedData(response.data);
-    } else {
-      throw new Error(response.error || 'Failed to scrape page');
+    if (!scrapeResponse.success) {
+      throw new Error(scrapeResponse.error || 'Failed to scrape page');
     }
+    
+    const { pageText, formFields, title, url } = scrapeResponse.data;
+    
+    // Step 2: Analyze with Groq (single API call)
+    btnLoading.textContent = 'Analyzing questions...';
+    const analyzeResponse = await browser.runtime.sendMessage({
+      action: 'analyzePageQuestions',
+      data: {
+        pageText,
+        pageTitle: title,
+        pageUrl: url
+      }
+    });
+    
+    if (!analyzeResponse.success) {
+      throw new Error(analyzeResponse.error || 'Failed to analyze page');
+    }
+    
+    // Store analyzed data
+    analyzedData = {
+      questions: analyzeResponse.questions,
+      formFields,
+      pageTitle: title,
+      pageUrl: url
+    };
+    
+    // Display results
+    displayAnalyzedData(analyzedData);
+    
   } catch (error) {
-    // Content script might not be loaded, try injecting it
     if (error.message.includes('Receiving end does not exist')) {
-      showAppError('Content script not loaded. Make sure you\'re on a supported job application page and refresh.');
+      showAppError('Content script not loaded. Please refresh the page and try again.');
     } else {
-      showAppError(error.message || 'Failed to scrape page');
+      showAppError(error.message || 'Failed to analyze page');
     }
   } finally {
     button.disabled = false;
-    button.querySelector('span').textContent = originalText;
+    btnText.style.display = 'inline';
+    btnLoading.style.display = 'none';
+    btnLoading.textContent = 'Analyzing...';
   }
 }
 
-function displayScrapedData(data) {
-  // Job info
-  if (data.company || data.role) {
-    document.getElementById('scrapedCompany').textContent = data.company || 'Unknown Company';
-    document.getElementById('scrapedRole').textContent = data.role || 'Unknown Role';
-    document.getElementById('jobInfoSection').style.display = 'block';
-    
-    if (data.jobDescription) {
-      document.getElementById('scrapedJD').textContent = data.jobDescription;
-    }
+function displayAnalyzedData(data) {
+  // Page info
+  if (data.pageTitle) {
+    document.getElementById('pageTitle').textContent = data.pageTitle;
+    document.getElementById('pageInfoSection').style.display = 'block';
   }
   
-  // Questions
+  // Questions & Answers
   if (data.questions && data.questions.length > 0) {
     document.getElementById('questionCount').textContent = data.questions.length;
     renderQuestions(data.questions);
     document.getElementById('questionsSection').style.display = 'block';
   }
   
-  // Profile fields
-  if (data.profileFields && data.profileFields.length > 0) {
-    document.getElementById('profileFieldCount').textContent = data.profileFields.length;
-    renderProfileFields(data.profileFields);
+  // Profile fields (only show fields that have a profile value)
+  const profileFields = data.formFields.filter(f => f.isProfileField && f.profileValue);
+  if (profileFields.length > 0) {
+    document.getElementById('profileFieldCount').textContent = profileFields.length;
+    renderProfileFields(profileFields);
     document.getElementById('profileFieldsSection').style.display = 'block';
   }
 }
@@ -460,41 +437,41 @@ function renderQuestions(questions) {
     const card = document.createElement('div');
     card.className = 'question-card';
     card.dataset.index = index;
+    
+    const hasAnswer = q.answer && q.answer !== 'NA';
+    
     card.innerHTML = `
       <div class="question-card-header">
-        <span class="question-text">${escapeHtml(q.text)}</span>
-        <span class="question-badge ${q.required ? 'required' : ''}">${q.required ? 'Required' : 'Optional'}</span>
+        <span class="question-text">${escapeHtml(q.question)}</span>
       </div>
-      <div class="question-answer" style="display: none;"></div>
+      <div class="question-answer ${hasAnswer ? '' : 'no-answer'}">${escapeHtml(q.answer || 'NA')}</div>
       <div class="question-actions">
         <div class="question-tweak">
           <input type="text" placeholder="Tweak instructions (optional)" class="tweak-input">
         </div>
-        <button class="btn-secondary btn-question btn-generate-one" data-index="${index}">Generate</button>
-        <button class="btn-secondary btn-question btn-fill" data-index="${index}" style="display: none;">Fill</button>
-        <button class="btn-copy btn-question" data-index="${index}" style="display: none;">Copy</button>
+        <button class="btn-secondary btn-question btn-regenerate" data-index="${index}">Regenerate</button>
+        <button class="btn-copy btn-question" data-index="${index}" ${hasAnswer ? '' : 'disabled'}>Copy</button>
       </div>
     `;
     container.appendChild(card);
   });
   
   // Add event listeners
-  container.querySelectorAll('.btn-generate-one').forEach(btn => {
-    btn.addEventListener('click', () => generateSingleAnswer(parseInt(btn.dataset.index)));
-  });
-  
-  container.querySelectorAll('.btn-fill').forEach(btn => {
-    btn.addEventListener('click', () => fillSingleAnswer(parseInt(btn.dataset.index)));
+  container.querySelectorAll('.btn-regenerate').forEach(btn => {
+    btn.addEventListener('click', () => regenerateAnswer(parseInt(btn.dataset.index)));
   });
   
   container.querySelectorAll('.btn-copy').forEach(btn => {
-    btn.addEventListener('click', () => copySingleAnswer(parseInt(btn.dataset.index)));
+    btn.addEventListener('click', () => copyAnswer(parseInt(btn.dataset.index)));
   });
 }
 
 function renderProfileFields(fields) {
   const container = document.getElementById('profileFieldsList');
   container.innerHTML = '';
+  
+  // Store for later use
+  analyzedData.profileFieldsToFill = fields;
   
   fields.forEach((field, index) => {
     const item = document.createElement('div');
@@ -509,113 +486,56 @@ function renderProfileFields(fields) {
   });
 }
 
-async function generateSingleAnswer(index) {
-  if (!scrapedData || !scrapedData.questions[index]) return;
+async function regenerateAnswer(index) {
+  if (!analyzedData || !analyzedData.questions[index]) return;
   
   const card = document.querySelector(`.question-card[data-index="${index}"]`);
-  const btn = card.querySelector('.btn-generate-one');
-  const question = scrapedData.questions[index];
+  const btn = card.querySelector('.btn-regenerate');
+  const question = analyzedData.questions[index];
   const tweakInput = card.querySelector('.tweak-input');
   
   btn.disabled = true;
   btn.textContent = 'Generating...';
-  card.classList.add('generating');
   
   try {
     const response = await browser.runtime.sendMessage({
-      action: 'generateAnswer',
+      action: 'regenerateAnswer',
       data: {
-        question: question.text,
-        company: scrapedData.company || '',
-        jobDescription: scrapedData.jobDescription || '',
-        customInstructions: tweakInput.value.trim()
+        question: question.question,
+        customInstructions: tweakInput.value.trim(),
+        pageUrl: analyzedData.pageUrl,
+        pageTitle: analyzedData.pageTitle
       }
     });
     
     if (response.success) {
-      // Store answer in scraped data
-      scrapedData.questions[index].answer = response.answer;
+      // Update stored answer
+      analyzedData.questions[index].answer = response.answer;
       
-      // Show answer
+      // Update UI
       const answerEl = card.querySelector('.question-answer');
       answerEl.textContent = response.answer;
-      answerEl.style.display = 'block';
+      answerEl.classList.remove('no-answer');
       
-      // Show fill and copy buttons
-      card.querySelector('.btn-fill').style.display = 'inline-flex';
-      card.querySelector('.btn-copy').style.display = 'inline-flex';
-      
-      card.classList.add('completed');
+      // Enable copy button
+      card.querySelector('.btn-copy').disabled = false;
     } else {
-      showAppError(response.error || 'Failed to generate answer');
+      showAppError(response.error || 'Failed to regenerate answer');
     }
   } catch (error) {
     showAppError(error.message || 'An unexpected error occurred');
   } finally {
     btn.disabled = false;
     btn.textContent = 'Regenerate';
-    card.classList.remove('generating');
   }
 }
 
-async function generateAllAnswers() {
-  if (!scrapedData || !scrapedData.questions) return;
+async function copyAnswer(index) {
+  if (!analyzedData || !analyzedData.questions[index]) return;
   
-  const button = document.getElementById('generateAllBtn');
-  const btnText = button.querySelector('.btn-text');
-  const btnLoading = button.querySelector('.btn-loading');
+  const answer = analyzedData.questions[index].answer;
+  if (!answer || answer === 'NA') return;
   
-  button.disabled = true;
-  btnText.style.display = 'none';
-  btnLoading.style.display = 'inline';
-  
-  try {
-    for (let i = 0; i < scrapedData.questions.length; i++) {
-      if (!scrapedData.questions[i].answer) {
-        await generateSingleAnswer(i);
-        // Small delay between requests
-        await new Promise(resolve => setTimeout(resolve, 500));
-      }
-    }
-  } finally {
-    button.disabled = false;
-    btnText.style.display = 'inline';
-    btnLoading.style.display = 'none';
-  }
-}
-
-async function fillSingleAnswer(index) {
-  if (!scrapedData || !scrapedData.questions[index] || !scrapedData.questions[index].answer) return;
-  
-  const question = scrapedData.questions[index];
-  
-  try {
-    const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
-    
-    await browser.tabs.sendMessage(tab.id, {
-      action: 'fillField',
-      data: {
-        selector: question.selector,
-        value: question.answer
-      }
-    });
-    
-    // Mark as filled
-    const card = document.querySelector(`.question-card[data-index="${index}"]`);
-    const btn = card.querySelector('.btn-fill');
-    btn.textContent = 'Filled!';
-    setTimeout(() => {
-      btn.textContent = 'Fill';
-    }, 2000);
-  } catch (error) {
-    showAppError('Failed to fill field: ' + error.message);
-  }
-}
-
-async function copySingleAnswer(index) {
-  if (!scrapedData || !scrapedData.questions[index] || !scrapedData.questions[index].answer) return;
-  
-  const answer = scrapedData.questions[index].answer;
   const card = document.querySelector(`.question-card[data-index="${index}"]`);
   const btn = card.querySelector('.btn-copy');
   
@@ -626,7 +546,7 @@ async function copySingleAnswer(index) {
       btn.textContent = 'Copy';
     }, 2000);
   } catch (error) {
-    // Fallback
+    // Fallback for older browsers
     const textArea = document.createElement('textarea');
     textArea.value = answer;
     document.body.appendChild(textArea);
@@ -642,7 +562,7 @@ async function copySingleAnswer(index) {
 }
 
 async function fillAllProfileFields() {
-  if (!scrapedData || !scrapedData.profileFields) return;
+  if (!analyzedData || !analyzedData.profileFieldsToFill) return;
   
   const button = document.getElementById('fillProfileBtn');
   button.disabled = true;
@@ -651,30 +571,36 @@ async function fillAllProfileFields() {
   try {
     const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
     
-    for (const field of scrapedData.profileFields) {
-      if (field.profileValue) {
-        await browser.tabs.sendMessage(tab.id, {
-          action: 'fillField',
-          data: {
-            selector: field.selector,
-            value: field.profileValue
-          }
-        });
-        
-        // Mark as filled in UI
-        const items = document.querySelectorAll('.profile-field-item');
-        items.forEach(item => {
-          if (item.querySelector('.profile-field-label').textContent === field.label) {
-            item.classList.add('filled');
-            item.querySelector('.profile-field-status').textContent = 'Filled';
-          }
-        });
-        
-        await new Promise(resolve => setTimeout(resolve, 100));
+    let filledCount = 0;
+    for (const field of analyzedData.profileFieldsToFill) {
+      if (field.profileValue && field.selector) {
+        try {
+          await browser.tabs.sendMessage(tab.id, {
+            action: 'fillField',
+            data: {
+              selector: field.selector,
+              value: field.profileValue
+            }
+          });
+          
+          // Mark as filled in UI
+          const items = document.querySelectorAll('.profile-field-item');
+          items.forEach(item => {
+            if (item.querySelector('.profile-field-label').textContent === field.label) {
+              item.classList.add('filled');
+              item.querySelector('.profile-field-status').textContent = 'Filled';
+            }
+          });
+          
+          filledCount++;
+          await new Promise(resolve => setTimeout(resolve, 100));
+        } catch (e) {
+          console.error('Failed to fill field:', field.label, e);
+        }
       }
     }
     
-    button.textContent = 'Done!';
+    button.textContent = filledCount > 0 ? `Filled ${filledCount}!` : 'No fields to fill';
     setTimeout(() => {
       button.textContent = 'Fill All';
     }, 2000);

@@ -16,6 +16,12 @@ CRITICAL RULES - STRICTLY FOLLOW:
 4. If you cannot find relevant experience for a job requirement, simply omit it - do not make things up
 5. Only mention projects that are EXPLICITLY listed in the profile data
 
+MISSING INFORMATION:
+- For factual fields (current company, CTC, notice period, etc.) where info is NOT in the profile, just output "NA" or "N/A" - nothing else
+- NEVER say "The applicant's profile does not specify..." or "I cannot fill this" or similar
+- NEVER explain why you can't answer - just output the short answer or "NA"
+- For questions asking about experience you don't have info for, output "NA"
+
 VOICE & STYLE:
 - Write like a real person typing an email
 - Simple sentences. Clear structure.
@@ -36,7 +42,8 @@ ACCURACY:
 
 OUTPUT FORMAT:
 - Plain text only. No markdown, no bullet points (unless asked)
-- Ready to copy-paste into email or form field`;
+- Ready to copy-paste into email or form field
+- For short factual questions, give short answers (e.g., "NA", "0", "Immediate", etc.)`;
 
 // Initialize on install
 browser.runtime.onInstalled.addListener(async (details) => {
@@ -64,6 +71,10 @@ async function handleMessage(message) {
   switch (message.action) {
     case 'generateAnswer':
       return await generateAnswer(message.data);
+    case 'analyzePageQuestions':
+      return await analyzePageQuestions(message.data);
+    case 'regenerateAnswer':
+      return await regenerateAnswer(message.data);
     case 'refreshCache':
       return await forceRefreshCache();
     case 'getProfile':
@@ -144,6 +155,150 @@ async function generateAnswer(data) {
     generatedAnswer: response,
     modelUsed: model
   });
+
+  return { success: true, answer: response };
+}
+
+// === Page Analysis (Application Mode) ===
+
+// System prompt for analyzing page and extracting Q&A
+const ANALYSIS_SYSTEM_PROMPT = `You are analyzing a job application page to identify questions and generate answers for the applicant.
+
+You will receive:
+1. The page text content
+2. The applicant's complete profile data
+
+YOUR TASK:
+1. Identify all questions on the page that need text answers (ignore simple form fields like name, email, phone)
+2. For each question, generate a personalized answer using ONLY the applicant's profile data
+
+CRITICAL RULES:
+1. ONLY extract questions that require thoughtful text responses (cover letter, "why us", experience questions, etc.)
+2. DO NOT include simple profile fields (name, email, phone, LinkedIn URL, etc.) - these are handled separately
+3. ONLY use information from the applicant's profile - NEVER invent skills, projects, or experiences
+4. If you can't answer a question from the profile data, set answer to "NA"
+5. Keep answers concise but complete (2-4 sentences typically)
+
+OUTPUT FORMAT:
+Return a JSON array of objects. Each object has:
+- "question": The exact question text from the page
+- "answer": Your generated answer (or "NA" if cannot answer from profile)
+
+Example output:
+[
+  {"question": "Why do you want to work at our company?", "answer": "I'm interested in your work on..."},
+  {"question": "Describe a challenging project you've worked on", "answer": "I built a project called..."}
+]
+
+VOICE & STYLE for answers:
+- Write like a real person
+- Simple sentences, clear structure
+- No em-dashes, no buzzwords like "passionate", "excited", "leverage"
+- Direct and honest, no exaggeration
+- Plain text only, no markdown`;
+
+async function analyzePageQuestions(data) {
+  const { pageText, pageTitle, pageUrl } = data;
+  
+  if (!pageText || !pageText.trim()) {
+    throw new Error('No page content to analyze');
+  }
+
+  const settings = await getSettings();
+  if (!settings.groqApiKey) {
+    throw new Error('Groq API key not set. Go to Settings to add your API key.');
+  }
+
+  const profile = await getProfile();
+  const cache = await getCache();
+
+  // Build context from profile
+  const profileContext = buildContext(profile, cache);
+  
+  // Build user message
+  const userMessage = `Page URL: ${pageUrl || 'Unknown'}
+Page Title: ${pageTitle || 'Unknown'}
+
+=== PAGE CONTENT ===
+${pageText}
+=== END PAGE CONTENT ===
+
+Analyze the page content above, identify all questions that need text answers, and generate personalized answers using the applicant's profile.
+
+Return ONLY a JSON array. No explanation, no markdown, just the JSON array.`;
+
+  const messages = [
+    { role: 'system', content: ANALYSIS_SYSTEM_PROMPT + '\n\n' + profileContext },
+    { role: 'user', content: userMessage }
+  ];
+
+  // Use compound model for better analysis
+  const response = await callGroqAPI(settings.groqApiKey, 'groq/compound', messages, 0.2);
+  
+  // Parse JSON response
+  let questions;
+  try {
+    // Extract JSON from response (in case there's extra text)
+    const jsonMatch = response.match(/\[[\s\S]*\]/);
+    if (!jsonMatch) {
+      throw new Error('No JSON array found in response');
+    }
+    questions = JSON.parse(jsonMatch[0]);
+    
+    if (!Array.isArray(questions)) {
+      throw new Error('Response is not an array');
+    }
+  } catch (parseError) {
+    console.error('Failed to parse Groq response:', response);
+    throw new Error('Failed to parse AI response. Please try again.');
+  }
+
+  // Validate and clean questions
+  questions = questions
+    .filter(q => q.question && typeof q.question === 'string')
+    .map(q => ({
+      question: q.question.trim(),
+      answer: (q.answer || 'NA').trim()
+    }));
+
+  return { success: true, questions };
+}
+
+async function regenerateAnswer(data) {
+  const { question, customInstructions, pageUrl, pageTitle } = data;
+  
+  if (!question || !question.trim()) {
+    throw new Error('Question is required');
+  }
+
+  const settings = await getSettings();
+  if (!settings.groqApiKey) {
+    throw new Error('Groq API key not set.');
+  }
+
+  const profile = await getProfile();
+  const cache = await getCache();
+
+  // Build context from profile
+  const context = buildContext(profile, cache);
+  
+  // Build user message
+  let userMessage = `Question to answer: ${question}`;
+  
+  if (pageUrl) {
+    userMessage += `\n\nFrom application at: ${pageUrl}`;
+  }
+  
+  if (customInstructions) {
+    userMessage += `\n\nAdditional instructions: ${customInstructions}`;
+  }
+
+  const messages = [
+    { role: 'system', content: SYSTEM_PROMPT + '\n\n' + context },
+    { role: 'user', content: userMessage }
+  ];
+
+  const response = await callGroqAPI(settings.groqApiKey, 'groq/compound-mini', messages, 0.3);
 
   return { success: true, answer: response };
 }
@@ -272,57 +427,82 @@ async function forceRefreshCache() {
 
 async function fetchGitHubData(username) {
   try {
-    // Fetch repos
+    // Get GitHub token if available
+    const settings = await getSettings();
+    const headers = { 'Accept': 'application/vnd.github.v3+json' };
+    const hasToken = settings.githubToken && settings.githubToken.trim().length > 0;
+    
+    if (hasToken) {
+      headers['Authorization'] = `Bearer ${settings.githubToken}`;
+    }
+    
+    // With token: fetch all repos (100 per page, will paginate if needed)
+    // Without token: fetch 15 repos to conserve rate limit
+    const perPage = hasToken ? 100 : 15;
     const reposResponse = await fetch(
-      `${GITHUB_API_URL}/users/${username}/repos?sort=updated&per_page=30`,
-      { headers: { 'Accept': 'application/vnd.github.v3+json' } }
+      `${GITHUB_API_URL}/users/${username}/repos?sort=updated&per_page=${perPage}`,
+      { headers }
     );
 
     if (!reposResponse.ok) {
       if (reposResponse.status === 404) {
         throw new Error(`GitHub user "${username}" not found. Check your username.`);
       }
-      if (reposResponse.status === 403) {
-        throw new Error('GitHub API rate limit exceeded. Try again in a few minutes.');
+      if (reposResponse.status === 403 || reposResponse.status === 429) {
+        const remaining = reposResponse.headers.get('x-ratelimit-remaining');
+        const resetTime = reposResponse.headers.get('x-ratelimit-reset');
+        
+        if (remaining === '0' && resetTime) {
+          const resetDate = new Date(parseInt(resetTime) * 1000);
+          const minutes = Math.ceil((resetDate - Date.now()) / 60000);
+          throw new Error(`GitHub API rate limit exceeded. Resets in ${minutes} minutes. ${hasToken ? 'Check your token.' : 'Add a GitHub token in settings for higher limits.'}`);
+        }
+        throw new Error('GitHub API rate limit exceeded. Try again later or add a GitHub token for higher limits.');
       }
       throw new Error(`GitHub API error: ${reposResponse.status}`);
     }
 
     const repos = await reposResponse.json();
     
-    // Fetch README for each repo (in parallel, with limit)
+    // With token: process all repos
+    // Without token: process only 15 repos to conserve API calls
+    const reposToProcess = hasToken ? repos : repos.slice(0, 15);
+    
+    // Fetch README and languages for repos
     const repoData = await Promise.all(
-      repos.slice(0, 15).map(async (repo) => {
+      reposToProcess.map(async (repo) => {
         let readme = '';
+        let languages = [];
+        
+        // Fetch README
         try {
           const readmeResponse = await fetch(
             `${GITHUB_API_URL}/repos/${username}/${repo.name}/readme`,
-            { headers: { 'Accept': 'application/vnd.github.v3.raw' } }
+            { headers: { ...headers, 'Accept': 'application/vnd.github.v3.raw' } }
           );
           if (readmeResponse.ok) {
             readme = await readmeResponse.text();
-            // Truncate to 2000 chars
-            if (readme.length > 2000) {
-              readme = readme.substring(0, 2000);
+            // Truncate to 1500 chars (reduced from 2000)
+            if (readme.length > 1500) {
+              readme = readme.substring(0, 1500);
             }
           }
         } catch (e) {
-          // README fetch failed, that's okay
+          // README fetch failed, continue without it
         }
 
         // Fetch languages
-        let languages = [];
         try {
           const langResponse = await fetch(
             `${GITHUB_API_URL}/repos/${username}/${repo.name}/languages`,
-            { headers: { 'Accept': 'application/vnd.github.v3+json' } }
+            { headers }
           );
           if (langResponse.ok) {
             const langData = await langResponse.json();
             languages = Object.keys(langData);
           }
         } catch (e) {
-          // Languages fetch failed, that's okay
+          // Languages fetch failed, continue without it
         }
 
         return {
@@ -441,6 +621,7 @@ async function getSettings() {
   const storage = await browser.storage.local.get('settings');
   return storage.settings || {
     groqApiKey: '',
+    githubToken: '',
     historyRetentionDays: DEFAULT_HISTORY_RETENTION_DAYS
   };
 }

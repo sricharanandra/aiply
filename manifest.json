@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
   "name": "Aiply",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "Generate personalized job application answers using your profile, GitHub repos, and resume.",
   "icons": {
     "48": "icons/icon-48.png",
@@ -31,25 +31,8 @@
   },
   "content_scripts": [
     {
-      "matches": [
-        "*://docs.google.com/forms/*",
-        "*://*.greenhouse.io/*",
-        "*://boards.greenhouse.io/*",
-        "*://*.glassdoor.com/*",
-        "*://*.glassdoor.co.in/*",
-        "*://*.linkedin.com/jobs/*",
-        "*://*.internshala.com/*"
-      ],
-      "js": [
-        "content/platforms/google-forms.js",
-        "content/platforms/greenhouse.js",
-        "content/platforms/glassdoor.js",
-        "content/platforms/linkedin.js",
-        "content/platforms/internshala.js",
-        "content/platforms/generic.js",
-        "content/scraper.js"
-      ],
-      "css": [],
+      "matches": ["<all_urls>"],
+      "js": ["content/scraper.js"],
       "run_at": "document_idle"
     }
   ],

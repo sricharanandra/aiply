@@ -147,6 +147,10 @@ select {
   margin-top: 6px;
 }
 
+.hint.error {
+  color: #ff6b6b;
+}
+
 .input-group {
   display: flex;
   gap: 8px;
