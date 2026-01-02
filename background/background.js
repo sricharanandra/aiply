@@ -412,8 +412,21 @@ async function cleanupOldHistory() {
 async function getProfile() {
   const storage = await browser.storage.local.get('profile');
   return storage.profile || {
+    // Personal info
+    firstName: '',
+    middleName: '',
+    lastName: '',
+    email: '',
+    phone: '',
+    // Profile links
     githubUsername: '',
+    linkedinUrl: '',
+    twitterUrl: '',
+    portfolioUrl: '',
+    otherLinks: [],
+    // Projects
     deployedProjects: [],
+    // Resume
     resumeText: '',
     resumeFileName: ''
   };

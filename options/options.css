@@ -55,9 +55,31 @@ header h1 {
   font-size: 16px;
   font-weight: 600;
   color: #fff;
+  margin-bottom: 8px;
+}
+
+.section-hint {
+  font-size: 12px;
+  color: #666;
   margin-bottom: 20px;
   padding-bottom: 12px;
   border-bottom: 1px solid #2a2a2a;
+}
+
+.section h2 + .field,
+.section h2 + .field-row {
+  margin-top: 20px;
+}
+
+.field-row {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.field-row .field {
+  flex: 1;
+  margin-bottom: 0;
 }
 
 .field {
@@ -76,9 +98,16 @@ label {
   margin-bottom: 8px;
 }
 
+.optional {
+  font-weight: 400;
+  color: #666;
+}
+
 input[type="text"],
 input[type="password"],
 input[type="url"],
+input[type="email"],
+input[type="tel"],
 select,
 textarea {
   width: 100%;

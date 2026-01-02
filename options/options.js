@@ -23,7 +23,21 @@ async function loadProfile() {
   const response = await browser.runtime.sendMessage({ action: 'getProfile' });
   const profile = response || {};
   
+  // Personal info
+  document.getElementById('firstName').value = profile.firstName || '';
+  document.getElementById('middleName').value = profile.middleName || '';
+  document.getElementById('lastName').value = profile.lastName || '';
+  document.getElementById('email').value = profile.email || '';
+  document.getElementById('phone').value = profile.phone || '';
+  
+  // Profile links
   document.getElementById('githubUsername').value = profile.githubUsername || '';
+  document.getElementById('linkedinUrl').value = profile.linkedinUrl || '';
+  document.getElementById('twitterUrl').value = profile.twitterUrl || '';
+  document.getElementById('portfolioUrl').value = profile.portfolioUrl || '';
+  
+  // Other links
+  renderOtherLinksList(profile.otherLinks || []);
   
   // Load deployed projects
   renderProjectList(profile.deployedProjects || []);
@@ -77,6 +91,9 @@ function setupEventListeners() {
 
   // Add project
   document.getElementById('addProject').addEventListener('click', addProject);
+  
+  // Add other link
+  document.getElementById('addLink').addEventListener('click', addOtherLink);
   
   // Resume file upload
   document.getElementById('resumeFile').addEventListener('change', handleResumeUpload);
@@ -169,6 +186,76 @@ function extractNameFromUrl(url) {
   } catch {
     return 'Project';
   }
+}
+
+// === Other Links Management ===
+
+function renderOtherLinksList(links) {
+  const container = document.getElementById('otherLinksList');
+  container.innerHTML = '';
+  
+  links.forEach((link, index) => {
+    const item = document.createElement('div');
+    item.className = 'project-item';
+    item.innerHTML = `
+      <span class="project-name">${escapeHtml(link.name || 'Unnamed')}</span>
+      <span class="project-url">${escapeHtml(link.url)}</span>
+      <button class="remove-btn" data-index="${index}" title="Remove">×</button>
+    `;
+    container.appendChild(item);
+  });
+
+  // Add remove handlers
+  container.querySelectorAll('.remove-btn').forEach(btn => {
+    btn.addEventListener('click', () => removeOtherLink(parseInt(btn.dataset.index)));
+  });
+}
+
+function addOtherLink() {
+  const nameInput = document.getElementById('newLinkName');
+  const urlInput = document.getElementById('newLinkUrl');
+  
+  const name = nameInput.value.trim();
+  const url = urlInput.value.trim();
+  
+  if (!url) {
+    showStatus('Link URL is required', true);
+    return;
+  }
+  
+  if (!name) {
+    showStatus('Link name is required', true);
+    return;
+  }
+  
+  // Validate URL
+  try {
+    new URL(url);
+  } catch {
+    showStatus('Invalid URL format', true);
+    return;
+  }
+
+  const links = getOtherLinksFromDOM();
+  links.push({ name, url });
+  renderOtherLinksList(links);
+  
+  nameInput.value = '';
+  urlInput.value = '';
+}
+
+function removeOtherLink(index) {
+  const links = getOtherLinksFromDOM();
+  links.splice(index, 1);
+  renderOtherLinksList(links);
+}
+
+function getOtherLinksFromDOM() {
+  const items = document.getElementById('otherLinksList').querySelectorAll('.project-item');
+  return Array.from(items).map(item => ({
+    name: item.querySelector('.project-name').textContent,
+    url: item.querySelector('.project-url').textContent
+  }));
 }
 
 // === Resume Handling ===
@@ -379,8 +466,21 @@ async function saveAllSettings() {
     // Save profile
     const resumeFileInput = document.getElementById('resumeFile');
     const profile = {
+      // Personal info
+      firstName: document.getElementById('firstName').value.trim(),
+      middleName: document.getElementById('middleName').value.trim(),
+      lastName: document.getElementById('lastName').value.trim(),
+      email: document.getElementById('email').value.trim(),
+      phone: document.getElementById('phone').value.trim(),
+      // Profile links
       githubUsername: document.getElementById('githubUsername').value.trim(),
+      linkedinUrl: document.getElementById('linkedinUrl').value.trim(),
+      twitterUrl: document.getElementById('twitterUrl').value.trim(),
+      portfolioUrl: document.getElementById('portfolioUrl').value.trim(),
+      otherLinks: getOtherLinksFromDOM(),
+      // Projects
       deployedProjects: getProjectsFromDOM(),
+      // Resume
       resumeText: resumeFileInput.dataset.text || '',
       resumeFileName: resumeFileInput.dataset.fileName || ''
     };

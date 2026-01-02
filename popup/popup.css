@@ -9,7 +9,7 @@ body {
   background: #0d0d0d;
   color: #e0e0e0;
   line-height: 1.4;
-  width: 400px;
+  width: 480px;
   min-height: 300px;
 }
 
@@ -22,7 +22,7 @@ header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
   padding-bottom: 12px;
   border-bottom: 1px solid #2a2a2a;
 }
@@ -59,6 +59,42 @@ header h1 {
   border-color: #444;
 }
 
+/* Mode Tabs */
+.mode-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 16px;
+  padding: 4px;
+  background: #1a1a1a;
+  border-radius: 8px;
+}
+
+.mode-tab {
+  flex: 1;
+  padding: 10px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: #888;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.mode-tab:hover {
+  color: #aaa;
+}
+
+.mode-tab.active {
+  background: #2a2a2a;
+  color: #fff;
+}
+
+.mode-content {
+  display: block;
+}
+
 /* Setup message */
 .setup-message {
   text-align: center;
@@ -90,6 +126,9 @@ label {
 }
 
 input[type="text"],
+input[type="email"],
+input[type="url"],
+input[type="tel"],
 textarea {
   width: 100%;
   padding: 10px 12px;
@@ -185,6 +224,32 @@ textarea::placeholder {
 }
 
 .btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  background: #1a1a1a;
+  border: 1px solid #333;
+  border-radius: 6px;
+  color: #aaa;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: #222;
+  color: #fff;
+  border-color: #444;
+}
+
+.btn-secondary:disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }
@@ -295,6 +360,290 @@ textarea::placeholder {
   font-size: 12px;
   color: #cc8888;
   line-height: 1.5;
+}
+
+/* Application Mode Styles */
+
+/* Scrape Section */
+.scrape-section {
+  padding: 12px;
+  background: #1a1a1a;
+  border: 1px solid #2a2a2a;
+  border-radius: 8px;
+  margin-bottom: 16px;
+}
+
+.scrape-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.scrape-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.platform-badge {
+  display: inline-block;
+  padding: 4px 8px;
+  font-size: 11px;
+  font-weight: 500;
+  background: #2a2a2a;
+  border-radius: 4px;
+  color: #888;
+}
+
+.platform-badge.detected {
+  background: #1a3a2a;
+  color: #4aff8a;
+}
+
+.page-status {
+  font-size: 11px;
+  color: #666;
+}
+
+.scrape-hint {
+  font-size: 11px;
+  color: #666;
+  margin: 0;
+}
+
+.btn-scrape {
+  padding: 8px 14px;
+}
+
+/* Job Info Section */
+.job-info-section {
+  margin-bottom: 16px;
+  padding: 12px;
+  background: #1a1a1a;
+  border: 1px solid #2a2a2a;
+  border-radius: 8px;
+}
+
+.job-info-header {
+  margin-bottom: 12px;
+}
+
+.job-info-header h3 {
+  font-size: 14px;
+  font-weight: 600;
+  color: #fff;
+  margin-bottom: 4px;
+}
+
+.job-role {
+  font-size: 12px;
+  color: #888;
+}
+
+.scraped-jd {
+  padding: 10px;
+  font-size: 12px;
+  line-height: 1.5;
+  background: #0d0d0d;
+  border-radius: 4px;
+  color: #999;
+  max-height: 150px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+}
+
+/* Questions Section */
+.questions-section {
+  margin-bottom: 16px;
+}
+
+.questions-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.questions-header label {
+  margin-bottom: 0;
+  font-size: 13px;
+  color: #aaa;
+}
+
+.btn-generate-all {
+  padding: 8px 14px;
+}
+
+.questions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Question Card */
+.question-card {
+  padding: 12px;
+  background: #1a1a1a;
+  border: 1px solid #2a2a2a;
+  border-radius: 8px;
+}
+
+.question-card.generating {
+  border-color: #4a9eff44;
+}
+
+.question-card.completed {
+  border-color: #4aff4a44;
+}
+
+.question-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 8px;
+}
+
+.question-text {
+  font-size: 13px;
+  font-weight: 500;
+  color: #e0e0e0;
+  flex: 1;
+  margin-right: 8px;
+}
+
+.question-badge {
+  padding: 2px 6px;
+  font-size: 10px;
+  font-weight: 500;
+  background: #2a2a2a;
+  border-radius: 3px;
+  color: #666;
+  white-space: nowrap;
+}
+
+.question-badge.required {
+  background: #3a2a1a;
+  color: #ffaa4a;
+}
+
+.question-answer {
+  margin-top: 8px;
+  padding: 10px;
+  font-size: 12px;
+  line-height: 1.5;
+  background: #0d0d0d;
+  border-radius: 4px;
+  color: #ccc;
+  max-height: 150px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+}
+
+.question-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.question-tweak {
+  flex: 1;
+}
+
+.question-tweak input {
+  width: 100%;
+  padding: 8px 10px;
+  font-size: 11px;
+}
+
+.btn-question {
+  padding: 6px 10px;
+  font-size: 11px;
+}
+
+.btn-fill {
+  background: #1a3a2a;
+  border-color: #2a5a3a;
+  color: #4aff8a;
+}
+
+.btn-fill:hover {
+  background: #2a4a3a;
+}
+
+/* Profile Fields Section */
+.profile-fields-section {
+  margin-bottom: 16px;
+}
+
+.profile-fields-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.profile-fields-header label {
+  margin-bottom: 0;
+  font-size: 13px;
+  color: #aaa;
+}
+
+.profile-fields-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.profile-field-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  background: #1a1a1a;
+  border: 1px solid #2a2a2a;
+  border-radius: 6px;
+}
+
+.profile-field-item.filled {
+  border-color: #4aff4a44;
+}
+
+.profile-field-label {
+  flex: 1;
+  font-size: 12px;
+  color: #aaa;
+}
+
+.profile-field-value {
+  font-size: 12px;
+  color: #666;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profile-field-status {
+  font-size: 10px;
+  color: #4aff4a;
+}
+
+/* Loading States */
+.skeleton {
+  background: linear-gradient(90deg, #1a1a1a 25%, #2a2a2a 50%, #1a1a1a 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 4px;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
 }
 
 /* Scrollbar */

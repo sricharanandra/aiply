@@ -29,9 +29,42 @@
       </div>
     </section>
 
-    <!-- Profile -->
+    <!-- Personal Info -->
     <section class="section">
-      <h2>Profile</h2>
+      <h2>Personal Info</h2>
+      <p class="section-hint">Used for auto-filling application forms</p>
+      
+      <div class="field-row">
+        <div class="field">
+          <label for="firstName">First Name</label>
+          <input type="text" id="firstName" placeholder="John">
+        </div>
+        <div class="field">
+          <label for="middleName">Middle Name <span class="optional">(optional)</span></label>
+          <input type="text" id="middleName" placeholder="">
+        </div>
+        <div class="field">
+          <label for="lastName">Last Name</label>
+          <input type="text" id="lastName" placeholder="Doe">
+        </div>
+      </div>
+
+      <div class="field-row">
+        <div class="field">
+          <label for="email">Email</label>
+          <input type="email" id="email" placeholder="you@example.com">
+        </div>
+        <div class="field">
+          <label for="phone">Phone</label>
+          <input type="tel" id="phone" placeholder="+91 9876543210">
+        </div>
+      </div>
+    </section>
+
+    <!-- Profile Links -->
+    <section class="section">
+      <h2>Profile Links</h2>
+      <p class="section-hint">Used for auto-filling and as context for answers</p>
       
       <div class="field">
         <label for="githubUsername">GitHub Username</label>
@@ -40,7 +73,37 @@
       </div>
 
       <div class="field">
-        <label>Deployed Projects</label>
+        <label for="linkedinUrl">LinkedIn URL</label>
+        <input type="url" id="linkedinUrl" placeholder="https://linkedin.com/in/your-profile">
+      </div>
+
+      <div class="field">
+        <label for="twitterUrl">Twitter/X URL <span class="optional">(optional)</span></label>
+        <input type="url" id="twitterUrl" placeholder="https://x.com/your-handle">
+      </div>
+
+      <div class="field">
+        <label for="portfolioUrl">Portfolio URL <span class="optional">(optional)</span></label>
+        <input type="url" id="portfolioUrl" placeholder="https://your-portfolio.com">
+      </div>
+
+      <div class="field">
+        <label>Other Links <span class="optional">(optional)</span></label>
+        <div id="otherLinksList" class="project-list"></div>
+        <div class="add-project">
+          <input type="text" id="newLinkName" placeholder="Link name (e.g. Dribbble)">
+          <input type="url" id="newLinkUrl" placeholder="https://...">
+          <button type="button" id="addLink" class="btn-secondary">Add</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Deployed Projects -->
+    <section class="section">
+      <h2>Deployed Projects</h2>
+      <p class="section-hint">Live projects to showcase in applications</p>
+      
+      <div class="field">
         <div id="deployedProjectsList" class="project-list"></div>
         <div class="add-project">
           <input type="text" id="newProjectName" placeholder="Project name">
