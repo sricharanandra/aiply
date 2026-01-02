@@ -1,0 +1,31 @@
+{
+  "manifest_version": 2,
+  "name": "Aiply",
+  "version": "1.0.0",
+  "description": "Generate personalized job application answers using your profile, GitHub repos, and resume.",
+  "icons": {
+    "48": "icons/icon-48.png",
+    "96": "icons/icon-96.png"
+  },
+  "permissions": [
+    "storage",
+    "https://api.groq.com/*",
+    "https://api.github.com/*"
+  ],
+  "browser_action": {
+    "default_icon": {
+      "48": "icons/icon-48.png",
+      "96": "icons/icon-96.png"
+    },
+    "default_title": "Aiply",
+    "default_popup": "popup/popup.html"
+  },
+  "background": {
+    "scripts": ["background/background.js"],
+    "persistent": false
+  },
+  "options_ui": {
+    "page": "options/options.html",
+    "open_in_tab": true
+  }
+}

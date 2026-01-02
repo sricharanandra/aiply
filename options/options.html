@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Aiply Settings</title>
+  <link rel="stylesheet" href="options.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Aiply Settings</h1>
+      <p class="subtitle">Configure your profile for personalized job application answers</p>
+    </header>
+
+    <!-- API Setup -->
+    <section class="section">
+      <h2>API Setup</h2>
+      <div class="field">
+        <label for="apiKey">Groq API Key</label>
+        <div class="input-group">
+          <input type="password" id="apiKey" placeholder="gsk_...">
+          <button type="button" id="toggleApiKey" class="btn-icon" title="Show/hide">👁</button>
+        </div>
+        <p class="hint">
+          Get your free API key at 
+          <a href="https://console.groq.com/keys" target="_blank">console.groq.com/keys</a>
+        </p>
+      </div>
+    </section>
+
+    <!-- Profile -->
+    <section class="section">
+      <h2>Profile</h2>
+      
+      <div class="field">
+        <label for="githubUsername">GitHub Username</label>
+        <input type="text" id="githubUsername" placeholder="your-username">
+        <p class="hint">Your public repositories will be used for context</p>
+      </div>
+
+      <div class="field">
+        <label>Deployed Projects</label>
+        <div id="deployedProjectsList" class="project-list"></div>
+        <div class="add-project">
+          <input type="text" id="newProjectName" placeholder="Project name">
+          <input type="url" id="newProjectUrl" placeholder="https://...">
+          <button type="button" id="addProject" class="btn-secondary">Add</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Resume -->
+    <section class="section">
+      <h2>Resume</h2>
+      <div class="field">
+        <label>Upload Resume</label>
+        <div class="file-upload">
+          <input type="file" id="resumeFile" accept=".tex,.pdf,.txt">
+          <div class="file-info">
+            <span id="currentResumeFile">No file uploaded</span>
+            <button type="button" id="clearResume" class="btn-text" style="display: none;">Clear</button>
+          </div>
+        </div>
+        <p class="hint">Accepts .tex (LaTeX), .pdf, or .txt files</p>
+      </div>
+      <div class="field" id="resumePreviewContainer" style="display: none;">
+        <label>Resume Preview</label>
+        <textarea id="resumePreview" readonly rows="10"></textarea>
+      </div>
+    </section>
+
+    <!-- Cache -->
+    <section class="section">
+      <h2>GitHub Cache</h2>
+      <div class="cache-status">
+        <div class="cache-info">
+          <span id="cacheStatus">Not cached</span>
+          <span id="cacheTime" class="cache-time"></span>
+        </div>
+        <button type="button" id="refreshCache" class="btn-secondary">Refresh Now</button>
+      </div>
+    </section>
+
+    <!-- History Settings -->
+    <section class="section">
+      <h2>History</h2>
+      <div class="field">
+        <label for="historyRetention">Keep history for</label>
+        <select id="historyRetention">
+          <option value="7">7 days</option>
+          <option value="30">30 days</option>
+          <option value="90" selected>90 days</option>
+          <option value="180">180 days</option>
+          <option value="365">1 year</option>
+        </select>
+      </div>
+      <div class="history-actions">
+        <button type="button" id="viewHistory" class="btn-secondary">View History</button>
+        <button type="button" id="exportHistory" class="btn-secondary">Export JSON</button>
+        <button type="button" id="clearHistory" class="btn-danger">Clear All</button>
+      </div>
+    </section>
+
+    <!-- Save -->
+    <div class="actions">
+      <button type="button" id="saveSettings" class="btn-primary">Save Settings</button>
+      <span id="saveStatus" class="save-status"></span>
+    </div>
+  </div>
+
+  <script src="options.js"></script>
+</body>
+</html>
