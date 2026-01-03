@@ -138,6 +138,13 @@ function setupEventListeners() {
   
   // Save settings
   document.getElementById('saveSettings').addEventListener('click', saveAllSettings);
+  
+  // Export/Import
+  document.getElementById('exportData').addEventListener('click', exportAllData);
+  document.getElementById('importData').addEventListener('click', () => {
+    document.getElementById('importFile').click();
+  });
+  document.getElementById('importFile').addEventListener('change', importAllData);
 }
 
 // === Project Management ===
@@ -686,4 +693,70 @@ function escapeHtml(text) {
   const div = document.createElement('div');
   div.textContent = text;
   return div.innerHTML;
+}
+
+// === Export/Import ===
+
+async function exportAllData() {
+  try {
+    const settings = await browser.runtime.sendMessage({ action: 'getSettings' });
+    const profile = await browser.runtime.sendMessage({ action: 'getProfile' });
+    
+    const data = {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      settings,
+      profile
+    };
+    
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    
+    try {
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `aiply-backup-${new Date().toISOString().split('T')[0]}.json`;
+      a.click();
+      showStatus('Data exported');
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  } catch (error) {
+    showStatus(`Export failed: ${error.message}`, true);
+  }
+}
+
+async function importAllData(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  
+  try {
+    const text = await file.text();
+    const data = JSON.parse(text);
+    
+    if (!data.settings || !data.profile) {
+      throw new Error('Invalid backup file format');
+    }
+    
+    await browser.runtime.sendMessage({
+      action: 'saveSettings',
+      data: data.settings
+    });
+    
+    await browser.runtime.sendMessage({
+      action: 'saveProfile',
+      data: data.profile
+    });
+    
+    showStatus('Data imported successfully. Reloading...');
+    
+    setTimeout(() => {
+      window.location.reload();
+    }, 1000);
+    
+  } catch (error) {
+    showStatus(`Import failed: ${error.message}`, true);
+  }
+  
+  event.target.value = '';
 }
