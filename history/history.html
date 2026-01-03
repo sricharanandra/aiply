@@ -38,6 +38,10 @@
           <label>Question</label>
           <div id="detailQuestion" class="detail-text"></div>
         </div>
+        <div class="detail-section" id="detailSourceSection" style="display: none;">
+          <label>Source</label>
+          <div id="detailSource" class="detail-text detail-source"></div>
+        </div>
         <div class="detail-section" id="detailCompanySection">
           <label>Company</label>
           <div id="detailCompany" class="detail-text"></div>
@@ -46,7 +50,11 @@
           <label>Job Description</label>
           <div id="detailJD" class="detail-text"></div>
         </div>
-        <div class="detail-section">
+        <div class="detail-section" id="detailQuestionsListSection" style="display: none;">
+          <label>Questions & Answers (<span id="detailQuestionCount">0</span>)</label>
+          <div id="detailQuestionsList" class="detail-questions-list"></div>
+        </div>
+        <div class="detail-section" id="detailAnswerSection">
           <label>Generated Answer</label>
           <div id="detailAnswer" class="detail-text answer"></div>
         </div>

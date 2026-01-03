@@ -1,6 +1,7 @@
 // Aiply Popup Script
 
 const DRAFT_STORAGE_KEY = 'popupDraft';
+const APP_DRAFT_STORAGE_KEY = 'applicationDraft';
 const MODE_STORAGE_KEY = 'popupMode';
 
 document.addEventListener('DOMContentLoaded', init);
@@ -18,6 +19,7 @@ async function init() {
   
   await restoreMode();
   await restoreDraft();
+  await restoreAppDraft();
   setupEventListeners();
 }
 
@@ -124,6 +126,80 @@ async function clearDraft() {
   await browser.storage.local.remove(DRAFT_STORAGE_KEY);
 }
 
+// === Draft Persistence (Application Mode) ===
+
+// Store analyzed data in memory (will be synced with storage)
+let analyzedData = null;
+
+async function saveAppDraft() {
+  if (!analyzedData) return;
+  
+  const draft = {
+    analyzedData,
+    pageUrl: analyzedData.pageUrl,
+    timestamp: Date.now()
+  };
+  
+  await browser.storage.local.set({ [APP_DRAFT_STORAGE_KEY]: draft });
+}
+
+async function restoreAppDraft() {
+  try {
+    const storage = await browser.storage.local.get(APP_DRAFT_STORAGE_KEY);
+    const draft = storage[APP_DRAFT_STORAGE_KEY];
+    
+    if (!draft || !draft.analyzedData) return;
+    
+    // Check if we're on a different URL (expire if navigated away)
+    const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
+    const currentUrl = tab?.url || '';
+    
+    // If URL changed (different page), clear the draft
+    if (draft.pageUrl && currentUrl && !urlsMatch(draft.pageUrl, currentUrl)) {
+      await clearAppDraft();
+      return;
+    }
+    
+    // Check if draft is less than 1 hour old (backup expiration)
+    const age = Date.now() - (draft.timestamp || 0);
+    if (age > 60 * 60 * 1000) {
+      await clearAppDraft();
+      return;
+    }
+    
+    // Restore the analyzed data
+    analyzedData = draft.analyzedData;
+    displayAnalyzedData(analyzedData);
+    
+  } catch (e) {
+    console.error('Failed to restore app draft:', e);
+  }
+}
+
+// Compare URLs ignoring hash and minor differences
+function urlsMatch(url1, url2) {
+  try {
+    const u1 = new URL(url1);
+    const u2 = new URL(url2);
+    // Compare origin + pathname (ignore hash, query params can vary)
+    return u1.origin === u2.origin && u1.pathname === u2.pathname;
+  } catch {
+    return url1 === url2;
+  }
+}
+
+async function clearAppDraft() {
+  analyzedData = null;
+  await browser.storage.local.remove(APP_DRAFT_STORAGE_KEY);
+  
+  // Reset UI
+  document.getElementById('pageInfoSection').style.display = 'none';
+  document.getElementById('questionsSection').style.display = 'none';
+  document.getElementById('profileFieldsSection').style.display = 'none';
+  document.getElementById('noQuestionsSection').style.display = 'none';
+  hideAppError();
+}
+
 // Debounce helper
 function debounce(fn, delay) {
   let timeoutId;
@@ -200,6 +276,9 @@ function setupEventListeners() {
   
   // Analyze button
   document.getElementById('analyzeBtn').addEventListener('click', analyzePage);
+  
+  // Clear analysis button
+  document.getElementById('clearAnalysisBtn')?.addEventListener('click', clearAppDraft);
   
   // Fill profile fields button
   document.getElementById('fillProfileBtn').addEventListener('click', fillAllProfileFields);
@@ -331,9 +410,6 @@ async function copyOutput() {
 
 // === Application Mode Functions ===
 
-// Store analyzed data
-let analyzedData = null;
-
 async function analyzePage() {
   const button = document.getElementById('analyzeBtn');
   const btnText = button.querySelector('.btn-text');
@@ -348,6 +424,7 @@ async function analyzePage() {
   document.getElementById('pageInfoSection').style.display = 'none';
   document.getElementById('questionsSection').style.display = 'none';
   document.getElementById('profileFieldsSection').style.display = 'none';
+  document.getElementById('noQuestionsSection').style.display = 'none';
   
   try {
     const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
@@ -389,6 +466,9 @@ async function analyzePage() {
       pageUrl: url
     };
     
+    // Save to storage for persistence
+    await saveAppDraft();
+    
     // Display results
     displayAnalyzedData(analyzedData);
     
@@ -414,18 +494,34 @@ function displayAnalyzedData(data) {
   }
   
   // Questions & Answers
-  if (data.questions && data.questions.length > 0) {
+  const hasQuestions = data.questions && data.questions.length > 0;
+  if (hasQuestions) {
     document.getElementById('questionCount').textContent = data.questions.length;
     renderQuestions(data.questions);
     document.getElementById('questionsSection').style.display = 'block';
+    document.getElementById('noQuestionsSection').style.display = 'none';
+  } else {
+    document.getElementById('questionsSection').style.display = 'none';
+    document.getElementById('noQuestionsSection').style.display = 'block';
   }
   
-  // Profile fields (only show fields that have a profile value)
-  const profileFields = data.formFields.filter(f => f.isProfileField && f.profileValue);
+  // Profile fields - always show section, with matched fields having copy buttons
+  // Also show profile data summary for easy copy-paste
+  const profileFields = (data.formFields || []).filter(f => f.isProfileField && f.profileValue);
+  
+  // Always render profile section
+  renderProfileFields(profileFields, data.formFields || []);
+  document.getElementById('profileFieldsSection').style.display = 'block';
+  
+  // Update profile field count
+  document.getElementById('profileFieldCount').textContent = profileFields.length;
+  
+  // Show/hide Fill All button based on whether there are fillable fields
+  const fillBtn = document.getElementById('fillProfileBtn');
   if (profileFields.length > 0) {
-    document.getElementById('profileFieldCount').textContent = profileFields.length;
-    renderProfileFields(profileFields);
-    document.getElementById('profileFieldsSection').style.display = 'block';
+    fillBtn.style.display = 'inline-block';
+  } else {
+    fillBtn.style.display = 'none';
   }
 }
 
@@ -466,24 +562,147 @@ function renderQuestions(questions) {
   });
 }
 
-function renderProfileFields(fields) {
+function renderProfileFields(matchedFields, allFormFields) {
   const container = document.getElementById('profileFieldsList');
   container.innerHTML = '';
   
   // Store for later use
-  analyzedData.profileFieldsToFill = fields;
+  if (analyzedData) {
+    analyzedData.profileFieldsToFill = matchedFields;
+  }
   
-  fields.forEach((field, index) => {
+  if (matchedFields.length === 0) {
+    // Show empty state with profile summary
+    container.innerHTML = `
+      <div class="profile-empty-state">
+        <p>No auto-fillable fields detected on this page.</p>
+        <p class="profile-hint">Your profile data is shown below for easy copy-paste:</p>
+      </div>
+    `;
+    
+    // Show profile summary for manual copy-paste
+    renderProfileSummary(container);
+    return;
+  }
+  
+  // Render matched fields with copy buttons
+  matchedFields.forEach((field, index) => {
     const item = document.createElement('div');
     item.className = 'profile-field-item';
     item.dataset.index = index;
     item.innerHTML = `
-      <span class="profile-field-label">${escapeHtml(field.label)}</span>
-      <span class="profile-field-value">${escapeHtml(field.profileValue || 'Not set')}</span>
-      <span class="profile-field-status"></span>
+      <div class="profile-field-info">
+        <span class="profile-field-label">${escapeHtml(field.label)}</span>
+        <span class="profile-field-value">${escapeHtml(field.profileValue || 'Not set')}</span>
+      </div>
+      <div class="profile-field-actions">
+        <button class="btn-copy-small" data-value="${escapeHtml(field.profileValue || '')}" title="Copy value">Copy</button>
+        <span class="profile-field-status"></span>
+      </div>
     `;
     container.appendChild(item);
   });
+  
+  // Add copy button listeners
+  container.querySelectorAll('.btn-copy-small').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const value = btn.dataset.value;
+      await copyToClipboard(value, btn);
+    });
+  });
+  
+  // Add a separator and profile summary
+  const separator = document.createElement('div');
+  separator.className = 'profile-separator';
+  separator.innerHTML = '<span>All Profile Data</span>';
+  container.appendChild(separator);
+  
+  renderProfileSummary(container);
+}
+
+async function renderProfileSummary(container) {
+  // Get profile data
+  try {
+    const profile = await browser.runtime.sendMessage({ action: 'getProfile' });
+    
+    const profileData = [
+      { label: 'Full Name', value: [profile.firstName, profile.middleName, profile.lastName].filter(Boolean).join(' ') },
+      { label: 'First Name', value: profile.firstName },
+      { label: 'Last Name', value: profile.lastName },
+      { label: 'Email', value: profile.email },
+      { label: 'Phone', value: profile.phone },
+      { label: 'LinkedIn', value: profile.linkedinUrl },
+      { label: 'GitHub', value: profile.githubUsername ? `https://github.com/${profile.githubUsername}` : '' },
+      { label: 'Portfolio', value: profile.portfolioUrl },
+      { label: 'Twitter/X', value: profile.twitterUrl }
+    ].filter(item => item.value);
+    
+    if (profileData.length === 0) {
+      const emptyMsg = document.createElement('p');
+      emptyMsg.className = 'profile-hint';
+      emptyMsg.textContent = 'No profile data configured. Add your info in Settings.';
+      container.appendChild(emptyMsg);
+      return;
+    }
+    
+    const summaryGrid = document.createElement('div');
+    summaryGrid.className = 'profile-summary-grid';
+    
+    profileData.forEach(item => {
+      const row = document.createElement('div');
+      row.className = 'profile-summary-row';
+      row.innerHTML = `
+        <span class="profile-summary-label">${escapeHtml(item.label)}</span>
+        <span class="profile-summary-value">${escapeHtml(item.value)}</span>
+        <button class="btn-copy-small" data-value="${escapeHtml(item.value)}" title="Copy">Copy</button>
+      `;
+      summaryGrid.appendChild(row);
+    });
+    
+    container.appendChild(summaryGrid);
+    
+    // Add copy button listeners
+    summaryGrid.querySelectorAll('.btn-copy-small').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const value = btn.dataset.value;
+        await copyToClipboard(value, btn);
+      });
+    });
+    
+  } catch (e) {
+    console.error('Failed to load profile:', e);
+  }
+}
+
+async function copyToClipboard(text, button) {
+  try {
+    await navigator.clipboard.writeText(text);
+    const originalText = button.textContent;
+    button.textContent = 'Copied!';
+    button.classList.add('copied');
+    setTimeout(() => {
+      button.textContent = originalText;
+      button.classList.remove('copied');
+    }, 1500);
+  } catch (error) {
+    // Fallback
+    const textArea = document.createElement('textarea');
+    textArea.value = text;
+    document.body.appendChild(textArea);
+    textArea.select();
+    document.execCommand('copy');
+    document.body.removeChild(textArea);
+    
+    const originalText = button.textContent;
+    button.textContent = 'Copied!';
+    button.classList.add('copied');
+    setTimeout(() => {
+      button.textContent = originalText;
+      button.classList.remove('copied');
+    }, 1500);
+  }
 }
 
 async function regenerateAnswer(index) {
@@ -512,6 +731,9 @@ async function regenerateAnswer(index) {
       // Update stored answer
       analyzedData.questions[index].answer = response.answer;
       
+      // Save updated data to storage
+      await saveAppDraft();
+      
       // Update UI
       const answerEl = card.querySelector('.question-answer');
       answerEl.textContent = response.answer;
@@ -539,26 +761,7 @@ async function copyAnswer(index) {
   const card = document.querySelector(`.question-card[data-index="${index}"]`);
   const btn = card.querySelector('.btn-copy');
   
-  try {
-    await navigator.clipboard.writeText(answer);
-    btn.textContent = 'Copied!';
-    setTimeout(() => {
-      btn.textContent = 'Copy';
-    }, 2000);
-  } catch (error) {
-    // Fallback for older browsers
-    const textArea = document.createElement('textarea');
-    textArea.value = answer;
-    document.body.appendChild(textArea);
-    textArea.select();
-    document.execCommand('copy');
-    document.body.removeChild(textArea);
-    
-    btn.textContent = 'Copied!';
-    setTimeout(() => {
-      btn.textContent = 'Copy';
-    }, 2000);
-  }
+  await copyToClipboard(answer, btn);
 }
 
 async function fillAllProfileFields() {
@@ -586,9 +789,11 @@ async function fillAllProfileFields() {
           // Mark as filled in UI
           const items = document.querySelectorAll('.profile-field-item');
           items.forEach(item => {
-            if (item.querySelector('.profile-field-label').textContent === field.label) {
+            const label = item.querySelector('.profile-field-label');
+            if (label && label.textContent === field.label) {
               item.classList.add('filled');
-              item.querySelector('.profile-field-status').textContent = 'Filled';
+              const status = item.querySelector('.profile-field-status');
+              if (status) status.textContent = 'Filled';
             }
           });
           

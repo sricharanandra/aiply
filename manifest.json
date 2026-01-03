@@ -3,6 +3,15 @@
   "name": "Aiply",
   "version": "2.1.0",
   "description": "Generate personalized job application answers using your profile, GitHub repos, and resume.",
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "aiply@sricharandra.github.io",
+      "strict_min_version": "109.0",
+      "data_collection_permissions": {
+        "required": ["websiteContent"]
+      }
+    }
+  },
   "icons": {
     "48": "icons/icon-48.png",
     "96": "icons/icon-96.png"

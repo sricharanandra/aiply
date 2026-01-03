@@ -161,12 +161,7 @@
       return clone.textContent;
     }
     
-    // 3. Check aria-label
-    if (element.getAttribute('aria-label')) {
-      return element.getAttribute('aria-label');
-    }
-    
-    // 4. Check aria-labelledby
+    // 3. Check aria-labelledby first (more specific than aria-label)
     const labelledBy = element.getAttribute('aria-labelledby');
     if (labelledBy) {
       const labelEl = document.getElementById(labelledBy);
@@ -175,27 +170,88 @@
       }
     }
     
-    // 5. Check placeholder
-    if (element.placeholder) {
+    // 4. Check aria-label (but skip generic ones like "Your answer")
+    const ariaLabel = element.getAttribute('aria-label');
+    if (ariaLabel && !isGenericPlaceholder(ariaLabel)) {
+      return ariaLabel;
+    }
+    
+    // 5. Google Forms specific: Look for question container
+    // Google Forms structure: div[role="listitem"] > div > div > span (question text)
+    const listItem = element.closest('[role="listitem"]');
+    if (listItem) {
+      // Find the question text - usually in a span with specific attributes or the first text content
+      const questionSpan = listItem.querySelector('[role="heading"]') || 
+                           listItem.querySelector('[data-params]')?.closest('div')?.querySelector('span') ||
+                           listItem.querySelector('div > div > div > span');
+      if (questionSpan) {
+        const text = questionSpan.textContent.trim();
+        if (text && text.length < 200 && !isGenericPlaceholder(text)) {
+          return text;
+        }
+      }
+    }
+    
+    // 6. Look for nearby heading or question text (walking up the DOM)
+    let container = element.parentElement;
+    let depth = 0;
+    while (container && depth < 6) {
+      // Look for text content that looks like a label
+      const textNodes = [];
+      
+      // Check for span, div, or label with short text content
+      const candidates = container.querySelectorAll('span, label, div > span, [class*="label"], [class*="question"], [class*="title"]');
+      for (const candidate of candidates) {
+        const text = candidate.textContent.trim();
+        if (text && text.length > 0 && text.length < 150 && !isGenericPlaceholder(text)) {
+          // Make sure this isn't a child of the input or another input's label
+          if (!candidate.querySelector('input, textarea, select') && 
+              !candidate.closest('input, textarea, select')) {
+            textNodes.push(text);
+          }
+        }
+      }
+      
+      // Return the first reasonable label found
+      if (textNodes.length > 0) {
+        // Filter out common non-label texts
+        const filtered = textNodes.filter(t => !isGenericPlaceholder(t));
+        if (filtered.length > 0) {
+          return filtered[0];
+        }
+      }
+      
+      container = container.parentElement;
+      depth++;
+    }
+    
+    // 7. Check placeholder (but skip generic ones)
+    if (element.placeholder && !isGenericPlaceholder(element.placeholder)) {
       return element.placeholder;
     }
     
-    // 6. Check previous sibling text
+    // 8. Check previous sibling text
     const prevSibling = element.previousElementSibling;
-    if (prevSibling && (prevSibling.tagName === 'LABEL' || prevSibling.tagName === 'SPAN')) {
-      return prevSibling.textContent;
+    if (prevSibling && (prevSibling.tagName === 'LABEL' || prevSibling.tagName === 'SPAN' || prevSibling.tagName === 'DIV')) {
+      const text = prevSibling.textContent.trim();
+      if (text && text.length < 150 && !isGenericPlaceholder(text)) {
+        return text;
+      }
     }
     
-    // 7. Check parent's previous sibling or nearby text
+    // 9. Check parent's previous sibling or nearby text
     const parent = element.parentElement;
     if (parent) {
       const prevParentSibling = parent.previousElementSibling;
       if (prevParentSibling && prevParentSibling.textContent.length < 100) {
-        return prevParentSibling.textContent;
+        const text = prevParentSibling.textContent.trim();
+        if (!isGenericPlaceholder(text)) {
+          return text;
+        }
       }
     }
     
-    // 8. Check name attribute as fallback
+    // 10. Check name attribute as fallback
     if (element.name) {
       // Convert name to readable format (e.g., 'first_name' -> 'First Name')
       return element.name
@@ -205,6 +261,30 @@
     }
     
     return null;
+  }
+
+  // Check if text is a generic placeholder that shouldn't be used as a label
+  function isGenericPlaceholder(text) {
+    if (!text) return true;
+    const lower = text.toLowerCase().trim();
+    const genericPhrases = [
+      'your answer',
+      'enter your answer',
+      'type your answer',
+      'your response',
+      'enter here',
+      'type here',
+      'write here',
+      'answer here',
+      'optional',
+      'required',
+      '*',
+      'short answer',
+      'long answer',
+      'paragraph',
+      'text'
+    ];
+    return genericPhrases.some(phrase => lower === phrase || lower === phrase + ' text');
   }
 
   // Generate a unique CSS selector for an element
@@ -268,71 +348,112 @@
   function matchProfileFields(fields, profile) {
     if (!profile) return fields;
     
-    const fieldMatchers = {
-      // Name fields
-      'first name': () => profile.firstName,
-      'first_name': () => profile.firstName,
-      'firstname': () => profile.firstName,
-      'given name': () => profile.firstName,
-      'middle name': () => profile.middleName,
-      'middle_name': () => profile.middleName,
-      'middlename': () => profile.middleName,
-      'last name': () => profile.lastName,
-      'last_name': () => profile.lastName,
-      'lastname': () => profile.lastName,
-      'surname': () => profile.lastName,
-      'family name': () => profile.lastName,
-      'full name': () => getFullName(profile),
-      'your name': () => getFullName(profile),
-      'name': () => getFullName(profile),
-      
-      // Contact
-      'email': () => profile.email,
-      'e-mail': () => profile.email,
-      'email address': () => profile.email,
-      'phone': () => profile.phone,
-      'phone number': () => profile.phone,
-      'mobile': () => profile.phone,
-      'mobile number': () => profile.phone,
-      'contact number': () => profile.phone,
-      'telephone': () => profile.phone,
-      'cell': () => profile.phone,
-      
-      // Links
-      'linkedin': () => profile.linkedinUrl,
-      'linkedin url': () => profile.linkedinUrl,
-      'linkedin profile': () => profile.linkedinUrl,
-      'github': () => profile.githubUsername ? `https://github.com/${profile.githubUsername}` : '',
-      'github url': () => profile.githubUsername ? `https://github.com/${profile.githubUsername}` : '',
-      'github profile': () => profile.githubUsername ? `https://github.com/${profile.githubUsername}` : '',
-      'twitter': () => profile.twitterUrl,
-      'twitter url': () => profile.twitterUrl,
-      'x url': () => profile.twitterUrl,
-      'portfolio': () => profile.portfolioUrl,
-      'portfolio url': () => profile.portfolioUrl,
-      'website': () => profile.portfolioUrl,
-      'personal website': () => profile.portfolioUrl,
-      'personal site': () => profile.portfolioUrl
-    };
+    // Define keyword groups - if ANY keyword matches, use that profile value
+    // Keywords are checked as word boundaries or partial matches
+    const profileMatchers = [
+      {
+        // Full name - matches: name, full name, candidate name, your name, applicant name, legal name
+        keywords: ['full name', 'fullname', 'your name', 'candidate name', 'applicant name', 'legal name'],
+        exactMatch: ['name'], // Only match "name" if it's the entire label (not "company name")
+        getValue: () => getFullName(profile)
+      },
+      {
+        // First name
+        keywords: ['first name', 'firstname', 'first_name', 'given name', 'forename'],
+        getValue: () => profile.firstName
+      },
+      {
+        // Middle name
+        keywords: ['middle name', 'middlename', 'middle_name'],
+        getValue: () => profile.middleName
+      },
+      {
+        // Last name
+        keywords: ['last name', 'lastname', 'last_name', 'surname', 'family name', 'familyname'],
+        getValue: () => profile.lastName
+      },
+      {
+        // Email - matches: email, e-mail, email address, your email, candidate email, work email, personal email
+        keywords: ['email', 'e-mail', 'mail address'],
+        excludeKeywords: ['company email', 'employer email'], // Don't match these
+        getValue: () => profile.email
+      },
+      {
+        // Phone - matches: phone, mobile, cell, telephone, contact number, phone number
+        keywords: ['phone', 'mobile', 'cell', 'telephone', 'contact number', 'tel no', 'tel.', 'whatsapp'],
+        excludeKeywords: ['company phone', 'employer phone', 'emergency'],
+        getValue: () => profile.phone
+      },
+      {
+        // LinkedIn - matches: linkedin, linked in, linkedin url, linkedin profile
+        keywords: ['linkedin', 'linked in', 'linked-in'],
+        getValue: () => profile.linkedinUrl
+      },
+      {
+        // GitHub - matches: github, git hub, github url, github profile, github link
+        keywords: ['github', 'git hub', 'git-hub'],
+        getValue: () => profile.githubUsername ? `https://github.com/${profile.githubUsername}` : ''
+      },
+      {
+        // Twitter/X - matches: twitter, x.com, x profile, twitter handle
+        keywords: ['twitter', 'x.com', 'x profile', 'x handle', 'x url'],
+        exactMatch: ['x'], // Only match "x" if it's exact (avoid matching "experience")
+        getValue: () => profile.twitterUrl
+      },
+      {
+        // Portfolio - matches: portfolio, portfolio link, portfolio url, personal website, website, personal site
+        keywords: ['portfolio', 'personal website', 'personal site', 'personal url', 'your website', 'your site', 'homepage'],
+        exactMatch: ['website', 'site'],
+        getValue: () => profile.portfolioUrl
+      }
+    ];
 
     return fields.map(field => {
       const labelLower = (field.label || '').toLowerCase().trim();
+      // Remove common suffixes/prefixes for cleaner matching
+      const cleanLabel = labelLower
+        .replace(/\s*\*\s*/g, '') // Remove asterisks (required markers)
+        .replace(/\s*:\s*/g, '') // Remove colons
+        .replace(/^\s*(your|enter|please|provide|candidate's?|applicant's?)\s+/i, '') // Remove common prefixes
+        .trim();
       
-      // Try exact match first
-      if (fieldMatchers[labelLower]) {
-        field.profileValue = fieldMatchers[labelLower]();
-        field.isProfileField = true;
-        return field;
-      }
-      
-      // Try partial match
-      for (const [key, getter] of Object.entries(fieldMatchers)) {
-        if (labelLower.includes(key) || key.includes(labelLower)) {
-          const value = getter();
-          if (value) {
-            field.profileValue = value;
-            field.isProfileField = true;
-            return field;
+      // Try to find a matching profile field
+      for (const matcher of profileMatchers) {
+        // Check exclude keywords first
+        if (matcher.excludeKeywords) {
+          const isExcluded = matcher.excludeKeywords.some(exclude => 
+            cleanLabel.includes(exclude) || labelLower.includes(exclude)
+          );
+          if (isExcluded) continue;
+        }
+        
+        // Check exact matches (for short/ambiguous keywords like "name", "website", "x")
+        if (matcher.exactMatch) {
+          const isExactMatch = matcher.exactMatch.some(exact => 
+            cleanLabel === exact || labelLower === exact
+          );
+          if (isExactMatch) {
+            const value = matcher.getValue();
+            if (value) {
+              field.profileValue = value;
+              field.isProfileField = true;
+              return field;
+            }
+          }
+        }
+        
+        // Check keyword matches (partial matching)
+        if (matcher.keywords) {
+          const isMatch = matcher.keywords.some(keyword => 
+            cleanLabel.includes(keyword) || labelLower.includes(keyword)
+          );
+          if (isMatch) {
+            const value = matcher.getValue();
+            if (value) {
+              field.profileValue = value;
+              field.isProfileField = true;
+              return field;
+            }
           }
         }
       }

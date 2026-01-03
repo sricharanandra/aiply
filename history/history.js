@@ -33,7 +33,9 @@ function setupEventListeners() {
       const filtered = allHistory.filter(item => 
         item.question.toLowerCase().includes(query) ||
         (item.company && item.company.toLowerCase().includes(query)) ||
-        item.generatedAnswer.toLowerCase().includes(query)
+        item.generatedAnswer.toLowerCase().includes(query) ||
+        (item.pageTitle && item.pageTitle.toLowerCase().includes(query)) ||
+        (item.pageUrl && item.pageUrl.toLowerCase().includes(query))
       );
       renderHistory(filtered);
     } else {
@@ -85,11 +87,26 @@ function renderHistory(history) {
     
     for (const item of items) {
       const time = formatTime(new Date(item.timestamp));
+      const isApplicationMode = item.source === 'application';
+      const badgeHtml = isApplicationMode 
+        ? `<span class="history-item-badge">Application</span>` 
+        : '';
+      const questionCountHtml = item.questionCount 
+        ? `<span class="history-item-count">${item.questionCount} Q&A</span>` 
+        : '';
+      
+      // For application mode, show page title; for email mode, show question
+      const displayTitle = isApplicationMode 
+        ? (item.pageTitle || 'Page Analysis')
+        : truncate(item.question, 80);
+      
       html += `
-        <div class="history-item" data-id="${item.id}">
+        <div class="history-item ${isApplicationMode ? 'application-mode' : ''}" data-id="${item.id}">
           <div class="history-item-header">
-            <div class="history-item-question">${escapeHtml(truncate(item.question, 80))}</div>
+            <div class="history-item-question">${escapeHtml(displayTitle)}</div>
             <div class="history-item-meta">
+              ${badgeHtml}
+              ${questionCountHtml}
               ${item.company ? `<span class="history-item-company">${escapeHtml(item.company)}</span>` : ''}
               <span>${time}</span>
             </div>
@@ -149,7 +166,21 @@ function openDetail(id) {
 
   currentEntryId = id;
 
+  const isApplicationMode = item.source === 'application';
+  
+  // Question / Title
   document.getElementById('detailQuestion').textContent = item.question;
+  
+  // Source (for application mode)
+  const sourceSection = document.getElementById('detailSourceSection');
+  if (isApplicationMode && item.pageUrl) {
+    document.getElementById('detailSource').innerHTML = `
+      <a href="${escapeHtml(item.pageUrl)}" target="_blank" rel="noopener">${escapeHtml(item.pageUrl)}</a>
+    `;
+    sourceSection.style.display = 'block';
+  } else {
+    sourceSection.style.display = 'none';
+  }
   
   // Company
   const companySection = document.getElementById('detailCompanySection');
@@ -169,9 +200,67 @@ function openDetail(id) {
     jdSection.style.display = 'none';
   }
 
-  document.getElementById('detailAnswer').textContent = item.generatedAnswer;
+  // Questions list (for application mode with multiple Q&A)
+  const questionsListSection = document.getElementById('detailQuestionsListSection');
+  if (isApplicationMode && item.questions && item.questions.length > 0) {
+    document.getElementById('detailQuestionCount').textContent = item.questions.length;
+    renderDetailQuestions(item.questions);
+    questionsListSection.style.display = 'block';
+    // Hide the single answer section when we have multiple Q&A
+    document.getElementById('detailAnswerSection').style.display = 'none';
+  } else {
+    questionsListSection.style.display = 'none';
+    document.getElementById('detailAnswer').textContent = item.generatedAnswer;
+    document.getElementById('detailAnswerSection').style.display = 'block';
+  }
 
   document.getElementById('detailModal').style.display = 'flex';
+}
+
+function renderDetailQuestions(questions) {
+  const container = document.getElementById('detailQuestionsList');
+  container.innerHTML = '';
+  
+  questions.forEach((q, index) => {
+    const item = document.createElement('div');
+    item.className = 'detail-qa-item';
+    item.innerHTML = `
+      <div class="detail-qa-question">
+        <span class="detail-qa-number">${index + 1}.</span>
+        <span>${escapeHtml(q.question)}</span>
+      </div>
+      <div class="detail-qa-answer">${escapeHtml(q.answer)}</div>
+      <button class="btn-copy-small" data-answer="${escapeHtml(q.answer)}">Copy</button>
+    `;
+    container.appendChild(item);
+  });
+  
+  // Add copy listeners
+  container.querySelectorAll('.btn-copy-small').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const answer = btn.dataset.answer;
+      try {
+        await navigator.clipboard.writeText(answer);
+        btn.textContent = 'Copied!';
+        setTimeout(() => {
+          btn.textContent = 'Copy';
+        }, 1500);
+      } catch {
+        // Fallback
+        const textArea = document.createElement('textarea');
+        textArea.value = answer;
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+        btn.textContent = 'Copied!';
+        setTimeout(() => {
+          btn.textContent = 'Copy';
+        }, 1500);
+      }
+    });
+  });
 }
 
 function closeModal() {
@@ -180,11 +269,16 @@ function closeModal() {
 }
 
 async function copyCurrentAnswer() {
-  const answer = document.getElementById('detailAnswer').textContent;
+  const item = allHistory.find(h => h.id === currentEntryId);
+  if (!item) return;
+  
   const button = document.getElementById('copyAnswerBtn');
   
+  // For application mode with multiple Q&A, copy all
+  let textToCopy = item.generatedAnswer;
+  
   try {
-    await navigator.clipboard.writeText(answer);
+    await navigator.clipboard.writeText(textToCopy);
     button.textContent = 'Copied!';
     setTimeout(() => {
       button.textContent = 'Copy Answer';
@@ -192,7 +286,7 @@ async function copyCurrentAnswer() {
   } catch {
     // Fallback
     const textArea = document.createElement('textarea');
-    textArea.value = answer;
+    textArea.value = textToCopy;
     document.body.appendChild(textArea);
     textArea.select();
     document.execCommand('copy');

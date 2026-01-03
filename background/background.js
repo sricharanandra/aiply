@@ -261,6 +261,24 @@ Return ONLY a JSON array. No explanation, no markdown, just the JSON array.`;
       answer: (q.answer || 'NA').trim()
     }));
 
+  // Save all Q&A pairs to history as a grouped entry
+  const validQAs = questions.filter(q => q.answer && q.answer !== 'NA');
+  if (validQAs.length > 0) {
+    await saveToHistory({
+      question: `[Application Mode] ${pageTitle || pageUrl || 'Page Analysis'}`,
+      company: null,
+      jobDescription: null,
+      customInstructions: null,
+      generatedAnswer: validQAs.map(q => `Q: ${q.question}\nA: ${q.answer}`).join('\n\n---\n\n'),
+      modelUsed: 'groq/compound',
+      source: 'application',
+      pageUrl,
+      pageTitle,
+      questionCount: validQAs.length,
+      questions: validQAs // Store individual Q&A pairs for detailed view
+    });
+  }
+
   return { success: true, questions };
 }
 
