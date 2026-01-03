@@ -411,6 +411,9 @@ async function callGroqAPI(apiKey, model, messages, temperature = 0.3) {
   }
 
   const data = await response.json();
+  if (!data.choices || !data.choices[0] || !data.choices[0].message) {
+    throw new Error('Unexpected API response format');
+  }
   return data.choices[0].message.content;
 }
 
@@ -444,6 +447,11 @@ async function forceRefreshCache() {
 }
 
 async function fetchGitHubData(username) {
+  const sanitizedUsername = encodeURIComponent(username.trim());
+  if (!sanitizedUsername || sanitizedUsername !== username.trim()) {
+    throw new Error('Invalid GitHub username');
+  }
+  
   try {
     // Get GitHub token if available
     const settings = await getSettings();
@@ -458,7 +466,7 @@ async function fetchGitHubData(username) {
     // Without token: fetch 15 repos to conserve rate limit
     const perPage = hasToken ? 100 : 15;
     const reposResponse = await fetch(
-      `${GITHUB_API_URL}/users/${username}/repos?sort=updated&per_page=${perPage}`,
+      `${GITHUB_API_URL}/users/${sanitizedUsername}/repos?sort=updated&per_page=${perPage}`,
       { headers }
     );
 
@@ -495,7 +503,7 @@ async function fetchGitHubData(username) {
         // Fetch README
         try {
           const readmeResponse = await fetch(
-            `${GITHUB_API_URL}/repos/${username}/${repo.name}/readme`,
+            `${GITHUB_API_URL}/repos/${sanitizedUsername}/${repo.name}/readme`,
             { headers: { ...headers, 'Accept': 'application/vnd.github.v3.raw' } }
           );
           if (readmeResponse.ok) {
@@ -512,7 +520,7 @@ async function fetchGitHubData(username) {
         // Fetch languages
         try {
           const langResponse = await fetch(
-            `${GITHUB_API_URL}/repos/${username}/${repo.name}/languages`,
+            `${GITHUB_API_URL}/repos/${sanitizedUsername}/${repo.name}/languages`,
             { headers }
           );
           if (langResponse.ok) {

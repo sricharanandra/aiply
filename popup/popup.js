@@ -132,11 +132,12 @@ async function clearDraft() {
 let analyzedData = null;
 
 async function saveAppDraft() {
-  if (!analyzedData) return;
+  const data = analyzedData;
+  if (!data) return;
   
   const draft = {
-    analyzedData,
-    pageUrl: analyzedData.pageUrl,
+    analyzedData: data,
+    pageUrl: data.pageUrl,
     timestamp: Date.now()
   };
   
@@ -268,6 +269,8 @@ function setupEventListeners() {
       const activeMode = document.querySelector('.mode-tab.active').dataset.mode;
       if (activeMode === 'email') {
         generateAnswer();
+      } else if (activeMode === 'application') {
+        analyzePage();
       }
     }
   });
@@ -398,7 +401,11 @@ async function copyOutput() {
     textArea.value = output.textContent;
     document.body.appendChild(textArea);
     textArea.select();
-    document.execCommand('copy');
+    try {
+      document.execCommand('copy');
+    } catch (err) {
+      console.error('Fallback copy failed:', err);
+    }
     document.body.removeChild(textArea);
     
     button.querySelector('span').textContent = 'Copied!';
@@ -709,7 +716,9 @@ async function regenerateAnswer(index) {
   if (!analyzedData || !analyzedData.questions[index]) return;
   
   const card = document.querySelector(`.question-card[data-index="${index}"]`);
+  if (!card) return;
   const btn = card.querySelector('.btn-regenerate');
+  if (!btn) return;
   const question = analyzedData.questions[index];
   const tweakInput = card.querySelector('.tweak-input');
   

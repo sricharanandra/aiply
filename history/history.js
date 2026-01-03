@@ -174,10 +174,15 @@ function openDetail(id) {
   // Source (for application mode)
   const sourceSection = document.getElementById('detailSourceSection');
   if (isApplicationMode && item.pageUrl) {
-    document.getElementById('detailSource').innerHTML = `
-      <a href="${escapeHtml(item.pageUrl)}" target="_blank" rel="noopener">${escapeHtml(item.pageUrl)}</a>
-    `;
-    sourceSection.style.display = 'block';
+    const url = item.pageUrl;
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      document.getElementById('detailSource').innerHTML = `
+        <a href="${escapeHtml(url)}" target="_blank" rel="noopener">${escapeHtml(url)}</a>
+      `;
+      sourceSection.style.display = 'block';
+    } else {
+      sourceSection.style.display = 'none';
+    }
   } else {
     sourceSection.style.display = 'none';
   }
@@ -230,7 +235,7 @@ function renderDetailQuestions(questions) {
         <span>${escapeHtml(q.question)}</span>
       </div>
       <div class="detail-qa-answer">${escapeHtml(q.answer)}</div>
-      <button class="btn-copy-small" data-answer="${escapeHtml(q.answer)}">Copy</button>
+      <button class="btn-copy-small" data-index="${index}">Copy</button>
     `;
     container.appendChild(item);
   });
@@ -239,7 +244,8 @@ function renderDetailQuestions(questions) {
   container.querySelectorAll('.btn-copy-small').forEach(btn => {
     btn.addEventListener('click', async (e) => {
       e.stopPropagation();
-      const answer = btn.dataset.answer;
+      const idx = parseInt(btn.dataset.index);
+      const answer = questions[idx]?.answer || '';
       try {
         await navigator.clipboard.writeText(answer);
         btn.textContent = 'Copied!';
@@ -252,7 +258,11 @@ function renderDetailQuestions(questions) {
         textArea.value = answer;
         document.body.appendChild(textArea);
         textArea.select();
-        document.execCommand('copy');
+        try {
+          document.execCommand('copy');
+        } catch (err) {
+          console.error('Fallback copy failed:', err);
+        }
         document.body.removeChild(textArea);
         btn.textContent = 'Copied!';
         setTimeout(() => {

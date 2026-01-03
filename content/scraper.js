@@ -34,7 +34,8 @@
       const pageText = getCleanPageText();
       
       // Get user profile for matching profile fields
-      const profile = await browser.runtime.sendMessage({ action: 'getProfile' });
+      const response = await browser.runtime.sendMessage({ action: 'getProfile' });
+      const profile = response?.success === false ? null : response;
       
       // Find all form fields with their labels
       const formFields = findFormFields();
@@ -146,7 +147,7 @@
   function getFieldLabel(element) {
     // 1. Check for explicit label via 'for' attribute
     if (element.id) {
-      const label = document.querySelector(`label[for="${element.id}"]`);
+      const label = document.querySelector(`label[for="${CSS.escape(element.id)}"]`);
       if (label) {
         return label.textContent;
       }
@@ -346,7 +347,7 @@
 
   // Match form fields with user profile data
   function matchProfileFields(fields, profile) {
-    if (!profile) return fields;
+    if (!profile || typeof profile !== 'object' || Array.isArray(profile)) return fields;
     
     // Define keyword groups - if ANY keyword matches, use that profile value
     // Keywords are checked as word boundaries or partial matches
@@ -493,11 +494,15 @@
       element.value = '';
       
       // Set value using native setter (works with React/Vue/Angular)
-      const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
+      const descriptor = Object.getOwnPropertyDescriptor(
         tagName === 'input' ? HTMLInputElement.prototype : HTMLTextAreaElement.prototype,
         'value'
-      ).set;
-      nativeInputValueSetter.call(element, value);
+      );
+      if (descriptor && descriptor.set) {
+        descriptor.set.call(element, value);
+      } else {
+        element.value = value;
+      }
       
       // Trigger events
       element.dispatchEvent(new Event('input', { bubbles: true }));

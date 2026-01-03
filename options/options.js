@@ -109,7 +109,13 @@ function setupEventListeners() {
   document.getElementById('clearResume').addEventListener('click', clearResume);
   
   // Refresh cache
-  document.getElementById('refreshCache').addEventListener('click', refreshCache);
+  document.getElementById('refreshCache').addEventListener('click', async () => {
+    try {
+      await refreshCache();
+    } catch (error) {
+      showStatus(`Error: ${error.message}`, true);
+    }
+  });
   
   // History actions
   document.getElementById('viewHistory').addEventListener('click', viewHistory);
@@ -435,12 +441,14 @@ async function exportHistory() {
       const blob = new Blob([response.data], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `aiply-history-${new Date().toISOString().split('T')[0]}.json`;
-      a.click();
-      
-      URL.revokeObjectURL(url);
+      try {
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `aiply-history-${new Date().toISOString().split('T')[0]}.json`;
+        a.click();
+      } finally {
+        URL.revokeObjectURL(url);
+      }
       showStatus('History exported');
     }
   } catch (error) {
@@ -480,7 +488,7 @@ async function saveAllSettings() {
       data: {
         groqApiKey: document.getElementById('apiKey').value.trim(),
         githubToken: document.getElementById('githubToken').value.trim(),
-        historyRetentionDays: parseInt(document.getElementById('historyRetention').value)
+        historyRetentionDays: parseInt(document.getElementById('historyRetention').value) || 90
       }
     });
 
