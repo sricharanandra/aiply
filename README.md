@@ -9,7 +9,9 @@ Browser extension for generating personalized job application answers using AI, 
 - **Profile Auto-fill**: Automatically fills name, email, phone, and links on forms
 - **Smart Matching**: Detects form fields like "Name", "Portfolio link", "LinkedIn" across different platforms
 - **Persistent Answers**: Generated answers stay when you close the popup to copy-paste
-- **History**: All generated answers saved for future reference
+- **History Management**: All generated answers saved with search, export/import, and individual deletion
+- **Additional Context**: Research papers, certifications, achievements, and custom context for AI
+- **Backup & Restore**: Export/import all settings and profile data as JSON
 
 ## Installation
 
@@ -27,9 +29,27 @@ Browser extension for generating personalized job application answers using AI, 
    - Name, email, phone
    - GitHub username
    - LinkedIn, portfolio, Twitter/X URLs
+   - Other links and deployed projects
 4. Upload your resume (.tex, .pdf, or .txt)
-5. (Optional) Add a GitHub token for higher API rate limits
-6. Click "Save All Settings"
+5. (Optional) Add additional context:
+   - Research papers
+   - Certifications
+   - Achievements
+   - Other context (anything else relevant)
+6. (Optional) Add a GitHub token for higher API rate limits
+7. Click "Save All Settings"
+
+### Backup & Restore
+
+Export your settings and profile:
+1. Go to Settings
+2. Click "Export Settings"
+3. Save the JSON file
+
+Import settings on another browser:
+1. Go to Settings
+2. Click "Import Settings"
+3. Select your exported JSON file
 
 ### GitHub Token (Optional)
 
@@ -55,8 +75,14 @@ Use this when you're on a job application page:
 6. Click "Copy" on any answer to copy it
 7. Use "Regenerate" with custom instructions to tweak answers
 8. Click "Fill All" to auto-fill profile fields (name, email, etc.)
+9. Profile section shows all your data with individual Copy buttons
 
-Answers persist even when you close the popup to paste them.
+**Features:**
+- Answers persist even when you close the popup to paste them
+- Analysis clears automatically when you navigate to a different page
+- Click "Clear Analysis" to manually reset
+- All Q&A saved to history as grouped entries
+- Copy individual profile fields (email, phone, links) directly from popup
 
 ### Email Mode
 
@@ -73,14 +99,37 @@ Use this for manually entering questions (email applications, cover letters):
 
 **Keyboard shortcut:** Ctrl+Enter to generate
 
+### History Management
+
+View and manage all your generated answers:
+
+1. Click the Aiply icon, then click "History"
+2. Search by question text, company name, page title, or URL
+3. Click any entry to view full details
+4. Application Mode entries show all Q&A pairs grouped together
+5. Click "Copy" on individual answers
+6. Click "×" to delete individual entries
+7. Export all history to JSON for backup
+8. Import history from JSON to restore or merge
+
+**Features:**
+- Application Mode entries tagged with "Application" badge and question count
+- Email Mode entries show company name and custom instructions
+- Click page URLs in Application Mode entries to revisit the form
+- Import deduplicates entries automatically
+
 ## Tips
 
 - Application Mode works best on standard job application forms
 - For Google Forms, the extension detects question labels automatically
+- Enhanced field detection works on most form builders (Google Forms, Typeform, etc.)
+- Profile auto-fill matches common field variations: "Full Name", "Your Name", "Candidate Name"
 - Use custom instructions to adjust tone: "more casual", "more formal", "shorter"
+- Additional context (papers, certs, achievements) helps AI generate more relevant answers
 - LaTeX resumes (.tex) parse cleaner than PDFs
 - GitHub cache refreshes every 24 hours
 - Add a GitHub token if you hit rate limits
+- Export settings regularly to backup your profile data
 
 ## Files
 
