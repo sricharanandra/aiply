@@ -46,6 +46,12 @@ function setupEventListeners() {
   // Export
   document.getElementById('exportBtn').addEventListener('click', exportHistory);
 
+  // Import
+  document.getElementById('importBtn').addEventListener('click', () => {
+    document.getElementById('importFile').click();
+  });
+  document.getElementById('importFile').addEventListener('change', importHistory);
+
   // Clear all
   document.getElementById('clearBtn').addEventListener('click', clearAllHistory);
 
@@ -109,6 +115,7 @@ function renderHistory(history) {
               ${questionCountHtml}
               ${item.company ? `<span class="history-item-company">${escapeHtml(item.company)}</span>` : ''}
               <span>${time}</span>
+              <button class="btn-delete-item" data-id="${item.id}" title="Delete">×</button>
             </div>
           </div>
           <div class="history-item-answer">${escapeHtml(truncate(item.generatedAnswer, 150))}</div>
@@ -121,9 +128,29 @@ function renderHistory(history) {
 
   container.innerHTML = html;
 
-  // Add click handlers
+  // Add click handlers for opening detail
   container.querySelectorAll('.history-item').forEach(el => {
     el.addEventListener('click', () => openDetail(el.dataset.id));
+  });
+
+  // Add click handlers for delete buttons
+  container.querySelectorAll('.btn-delete-item').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const id = btn.dataset.id;
+      if (!confirm('Delete this entry?')) return;
+      
+      try {
+        await browser.runtime.sendMessage({
+          action: 'deleteHistoryItem',
+          id: id
+        });
+        allHistory = allHistory.filter(h => h.id !== id);
+        renderHistory(allHistory);
+      } catch (error) {
+        alert('Failed to delete: ' + error.message);
+      }
+    });
   });
 }
 
@@ -360,6 +387,52 @@ async function clearAllHistory() {
   } catch (error) {
     alert('Failed to clear history: ' + error.message);
   }
+}
+
+async function importHistory(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  
+  try {
+    const text = await file.text();
+    const importedHistory = JSON.parse(text);
+    
+    if (!Array.isArray(importedHistory)) {
+      throw new Error('Invalid history file format. Expected an array.');
+    }
+    
+    const existingIds = new Set(allHistory.map(item => item.id));
+    
+    const newItems = importedHistory.filter(item => {
+      if (!item.id || !item.timestamp || !item.question) {
+        return false;
+      }
+      return !existingIds.has(item.id);
+    });
+    
+    if (newItems.length === 0) {
+      alert('No new items to import. All items already exist in history.');
+      event.target.value = '';
+      return;
+    }
+    
+    const mergedHistory = [...allHistory, ...newItems];
+    
+    mergedHistory.sort((a, b) => {
+      return new Date(b.timestamp) - new Date(a.timestamp);
+    });
+    
+    await browser.storage.local.set({ history: mergedHistory });
+    
+    allHistory = mergedHistory;
+    renderHistory(allHistory);
+    
+    alert(`Successfully imported ${newItems.length} item(s).`);
+  } catch (error) {
+    alert('Import failed: ' + error.message);
+  }
+  
+  event.target.value = '';
 }
 
 function showError(message) {
