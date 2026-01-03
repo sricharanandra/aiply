@@ -54,6 +54,9 @@ async function loadProfile() {
       document.getElementById('resumePreviewContainer').style.display = 'block';
     }
   }
+  
+  // Load additional context
+  loadAdditionalContext(profile);
 }
 
 async function updateCacheStatus() {
@@ -101,6 +104,17 @@ function setupEventListeners() {
   
   // Add other link
   document.getElementById('addLink').addEventListener('click', addOtherLink);
+  
+  // Add additional context items
+  document.getElementById('addResearch').addEventListener('click', () => {
+    addContextItem('researchPapersList', 'newResearchTitle', 'newResearchDescription', 'newResearchUrl');
+  });
+  document.getElementById('addCertification').addEventListener('click', () => {
+    addContextItem('certificationsList', 'newCertificationTitle', 'newCertificationDescription', 'newCertificationUrl');
+  });
+  document.getElementById('addAchievement').addEventListener('click', () => {
+    addContextItem('achievementsList', 'newAchievementTitle', 'newAchievementDescription', null);
+  });
   
   // Resume file upload
   document.getElementById('resumeFile').addEventListener('change', handleResumeUpload);
@@ -269,6 +283,100 @@ function getOtherLinksFromDOM() {
     name: item.querySelector('.project-name').textContent,
     url: item.querySelector('.project-url').textContent
   }));
+}
+
+// === Additional Context Management ===
+
+function renderContextList(listId, items) {
+  const container = document.getElementById(listId);
+  container.innerHTML = '';
+  
+  items.forEach((item, index) => {
+    const el = document.createElement('div');
+    el.className = 'project-item';
+    el.innerHTML = `
+      <span class="project-name">${escapeHtml(item.title)}</span>
+      <span class="project-url">${escapeHtml(item.description || '')}${item.url ? ' - ' + escapeHtml(item.url) : ''}</span>
+      <button class="remove-btn" data-index="${index}" title="Remove">x</button>
+    `;
+    container.appendChild(el);
+  });
+
+  container.querySelectorAll('.remove-btn').forEach(btn => {
+    btn.addEventListener('click', () => removeContextItem(listId, parseInt(btn.dataset.index)));
+  });
+}
+
+function getContextListFromDOM(listId) {
+  const items = document.getElementById(listId).querySelectorAll('.project-item');
+  return Array.from(items).map(item => {
+    const urlText = item.querySelector('.project-url').textContent;
+    const urlMatch = urlText.match(/ - (https?:\/\/.+)$/);
+    return {
+      title: item.querySelector('.project-name').textContent,
+      description: urlMatch ? urlText.replace(urlMatch[0], '') : urlText,
+      url: urlMatch ? urlMatch[1] : null
+    };
+  });
+}
+
+function removeContextItem(listId, index) {
+  const items = getContextListFromDOM(listId);
+  items.splice(index, 1);
+  renderContextList(listId, items);
+}
+
+function addContextItem(listId, titleId, descriptionId, urlId) {
+  const titleInput = document.getElementById(titleId);
+  const descriptionInput = document.getElementById(descriptionId);
+  const urlInput = urlId ? document.getElementById(urlId) : null;
+  
+  const title = titleInput.value.trim();
+  const description = descriptionInput.value.trim();
+  const url = urlInput ? urlInput.value.trim() : '';
+  
+  if (!title) {
+    showStatus('Title is required', true);
+    return;
+  }
+  
+  if (url) {
+    try {
+      new URL(url);
+    } catch {
+      showStatus('Invalid URL format', true);
+      return;
+    }
+  }
+
+  const items = getContextListFromDOM(listId);
+  items.push({ title, description, url: url || null });
+  renderContextList(listId, items);
+  
+  titleInput.value = '';
+  descriptionInput.value = '';
+  if (urlInput) urlInput.value = '';
+}
+
+function loadAdditionalContext(profile) {
+  // Merge old publications into researchPapers for backward compatibility
+  const researchPapers = [
+    ...(profile.researchPapers || []),
+    ...(profile.publications || [])
+  ];
+  renderContextList('researchPapersList', researchPapers);
+  renderContextList('certificationsList', profile.certifications || []);
+  renderContextList('achievementsList', profile.achievements || []);
+  document.getElementById('otherContext').value = profile.otherContext || '';
+}
+
+function getAdditionalContextFromProfile() {
+  return {
+    researchPapers: getContextListFromDOM('researchPapersList'),
+    certifications: getContextListFromDOM('certificationsList'),
+    achievements: getContextListFromDOM('achievementsList'),
+    otherContext: document.getElementById('otherContext').value.trim()
+  };
 }
 
 // === Resume Handling ===
@@ -494,6 +602,7 @@ async function saveAllSettings() {
 
     // Save profile
     const resumeFileInput = document.getElementById('resumeFile');
+    const additionalContext = getAdditionalContextFromProfile();
     const profile = {
       // Personal info
       firstName: document.getElementById('firstName').value.trim(),
@@ -509,6 +618,11 @@ async function saveAllSettings() {
       otherLinks: getOtherLinksFromDOM(),
       // Projects
       deployedProjects: getProjectsFromDOM(),
+      // Additional context
+      researchPapers: additionalContext.researchPapers,
+      certifications: additionalContext.certifications,
+      achievements: additionalContext.achievements,
+      otherContext: additionalContext.otherContext,
       // Resume
       resumeText: resumeFileInput.dataset.text || '',
       resumeFileName: resumeFileInput.dataset.fileName || ''

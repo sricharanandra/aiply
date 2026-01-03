@@ -290,6 +290,28 @@ select {
   flex: 0.4;
 }
 
+.add-project.vertical {
+  flex-direction: column;
+}
+
+.add-project.vertical input,
+.add-project.vertical textarea,
+.add-project.vertical button {
+  width: 100%;
+  flex: none;
+}
+
+.add-project.vertical textarea {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 13px;
+  resize: vertical;
+}
+
+.add-project.vertical button {
+  align-self: flex-start;
+  width: auto;
+}
+
 /* File upload */
 .file-upload {
   display: flex;
@@ -358,6 +380,88 @@ select {
   display: flex;
   gap: 12px;
   flex-wrap: wrap;
+}
+
+/* Context list */
+.context-list {
+  margin-bottom: 12px;
+}
+
+.context-item {
+  padding: 12px;
+  background: #0d0d0d;
+  border: 1px solid #333;
+  border-radius: 6px;
+  margin-bottom: 8px;
+}
+
+.context-item-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.context-item-title {
+  font-weight: 500;
+  color: #e0e0e0;
+}
+
+.context-item-type {
+  font-size: 11px;
+  padding: 2px 8px;
+  background: #2a2a2a;
+  border-radius: 4px;
+  color: #888;
+  text-transform: capitalize;
+}
+
+.context-item-description {
+  font-size: 13px;
+  color: #999;
+  margin-bottom: 8px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.context-item-url {
+  font-size: 12px;
+  color: #4a9eff;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: block;
+  margin-bottom: 8px;
+}
+
+.context-item-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.add-context {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  background: #0d0d0d;
+  border: 1px dashed #333;
+  border-radius: 6px;
+}
+
+.add-context input,
+.add-context select,
+.add-context textarea {
+  width: 100%;
+}
+
+.add-context textarea {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 13px;
+}
+
+.add-context .btn-secondary {
+  align-self: flex-start;
 }
 
 /* Actions */

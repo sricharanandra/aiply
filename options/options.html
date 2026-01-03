@@ -146,6 +146,53 @@
       </div>
     </section>
 
+    <!-- Additional Context -->
+    <section class="section">
+      <h2>Additional Context</h2>
+      <p class="section-hint">Add information the AI should know when generating answers</p>
+      
+      <!-- Research & Publications -->
+      <div class="field">
+        <label>Research & Publications</label>
+        <div id="researchPapersList" class="project-list"></div>
+        <div class="add-project vertical">
+          <input type="text" id="newResearchTitle" placeholder="Title (e.g., Paper on Temporal Graph Networks)">
+          <textarea id="newResearchDescription" rows="3" placeholder="Description - key findings, technologies used, your contribution..."></textarea>
+          <input type="url" id="newResearchUrl" placeholder="URL (optional)">
+          <button type="button" id="addResearch" class="btn-secondary">Add</button>
+        </div>
+      </div>
+
+      <!-- Certifications -->
+      <div class="field">
+        <label>Certifications</label>
+        <div id="certificationsList" class="project-list"></div>
+        <div class="add-project vertical">
+          <input type="text" id="newCertificationTitle" placeholder="Certification name">
+          <textarea id="newCertificationDescription" rows="2" placeholder="Issuer, date, skills covered..."></textarea>
+          <input type="url" id="newCertificationUrl" placeholder="URL (optional)">
+          <button type="button" id="addCertification" class="btn-secondary">Add</button>
+        </div>
+      </div>
+
+      <!-- Achievements -->
+      <div class="field">
+        <label>Achievements</label>
+        <div id="achievementsList" class="project-list"></div>
+        <div class="add-project vertical">
+          <input type="text" id="newAchievementTitle" placeholder="Achievement title">
+          <textarea id="newAchievementDescription" rows="2" placeholder="Description - what you accomplished, impact..."></textarea>
+          <button type="button" id="addAchievement" class="btn-secondary">Add</button>
+        </div>
+      </div>
+
+      <!-- Other Context -->
+      <div class="field">
+        <label>Other Context <span class="optional">(anything else the AI should know)</span></label>
+        <textarea id="otherContext" rows="4" placeholder="Any other relevant information like work experience details, skills not on resume, personal projects, volunteer work, etc."></textarea>
+      </div>
+    </section>
+
     <!-- Cache -->
     <section class="section">
       <h2>GitHub Cache</h2>

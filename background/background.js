@@ -370,6 +370,52 @@ function buildContext(profile, cache, jobDescription) {
     context += '\n';
   }
 
+  // Additional context (research papers, certifications, etc.)
+  const hasResearch = profile.researchPapers && profile.researchPapers.length > 0;
+  const hasCertifications = profile.certifications && profile.certifications.length > 0;
+  const hasAchievements = profile.achievements && profile.achievements.length > 0;
+  const hasOtherContext = profile.otherContext && profile.otherContext.trim();
+
+  if (hasResearch || hasCertifications || hasAchievements || hasOtherContext) {
+    context += '--- Additional Background ---\n';
+    
+    if (hasResearch) {
+      context += '\nResearch & Publications:\n';
+      for (const item of profile.researchPapers) {
+        context += `- ${item.title}`;
+        if (item.description) context += `: ${item.description}`;
+        if (item.url) context += ` (${item.url})`;
+        context += '\n';
+      }
+    }
+    
+    if (hasCertifications) {
+      context += '\nCertifications:\n';
+      for (const item of profile.certifications) {
+        context += `- ${item.title}`;
+        if (item.description) context += `: ${item.description}`;
+        if (item.url) context += ` (${item.url})`;
+        context += '\n';
+      }
+    }
+    
+    if (hasAchievements) {
+      context += '\nAchievements:\n';
+      for (const item of profile.achievements) {
+        context += `- ${item.title}`;
+        if (item.description) context += `: ${item.description}`;
+        context += '\n';
+      }
+    }
+    
+    if (hasOtherContext) {
+      context += '\nOther Information:\n';
+      context += profile.otherContext + '\n';
+    }
+    
+    context += '\n';
+  }
+
   context += '=== END OF PROFILE DATA ===\n';
   context += 'REMINDER: Only reference skills, projects, and experiences that appear above. Do not invent anything.\n';
 
@@ -632,6 +678,11 @@ async function getProfile() {
     otherLinks: [],
     // Projects
     deployedProjects: [],
+    // Additional context
+    researchPapers: [],
+    certifications: [],
+    achievements: [],
+    otherContext: '',
     // Resume
     resumeText: '',
     resumeFileName: ''
