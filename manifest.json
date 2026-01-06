@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
   "name": "Aiply",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "description": "Generate personalized job application answers using your profile, GitHub repos, and resume.",
   "browser_specific_settings": {
     "gecko": {
