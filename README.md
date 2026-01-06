@@ -131,19 +131,6 @@ View and manage all your generated answers:
 - Add a GitHub token if you hit rate limits
 - Export settings regularly to backup your profile data
 
-## Files
-
-```
-aiply/
-├── manifest.json      # Extension config
-├── background/        # API logic, caching
-├── content/           # Page scraper
-├── popup/             # Main UI (both modes)
-├── options/           # Settings page
-├── history/           # Generation history
-├── lib/pdfjs/         # PDF parsing
-└── icons/             # Extension icons
-```
 
 ## Rate Limits
 
