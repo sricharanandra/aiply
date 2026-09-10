@@ -36,6 +36,8 @@
     <div id="modeTabs" class="mode-tabs">
       <button class="mode-tab active" data-mode="email">Email Mode</button>
       <button class="mode-tab" data-mode="application">Application Mode</button>
+      <button class="mode-tab" data-mode="coverletter">Cover Letter</button>
+      <button class="mode-tab" data-mode="analyzer">Analyzer</button>
     </div>
 
     <!-- Email Mode (existing functionality) -->
@@ -55,7 +57,7 @@
           Job Description <span class="optional">(optional)</span>
           <span class="toggle-icon">+</span>
         </button>
-        <div class="collapse-content" id="jdContent" style="display: none;">
+        <div class="collapse-content" id="jdContent">
           <textarea id="jobDescription" rows="4" placeholder="Paste the job description here..."></textarea>
         </div>
       </div>
@@ -65,8 +67,28 @@
           Custom Instructions <span class="optional">(optional)</span>
           <span class="toggle-icon">+</span>
         </button>
-        <div class="collapse-content" id="instructionsContent" style="display: none;">
+        <div class="collapse-content" id="instructionsContent">
           <textarea id="customInstructions" rows="2" placeholder="e.g. make it more formal, keep it under 100 words..."></textarea>
+        </div>
+      </div>
+
+      <div class="controls-row">
+        <div class="control-group">
+          <label for="toneSelectEmail">Tone</label>
+          <select id="toneSelectEmail">
+            <option value="professional-human">Professional & Human</option>
+            <option value="professional">Professional</option>
+            <option value="concise">Concise</option>
+            <option value="enthusiastic">Enthusiastic</option>
+          </select>
+        </div>
+        <div class="control-group">
+          <label for="lengthSelectEmail">Length</label>
+          <select id="lengthSelectEmail">
+            <option value="brief">Brief</option>
+            <option value="standard" selected>Standard</option>
+            <option value="detailed">Detailed</option>
+          </select>
         </div>
       </div>
 
@@ -169,6 +191,178 @@
           <span>Error</span>
         </div>
         <p id="appErrorMessage"></p>
+      </div>
+    </main>
+
+    <!-- Cover Letter Mode -->
+    <main id="coverLetterMode" class="mode-content" style="display: none;">
+      <div class="field">
+        <label for="clCompany">Company Name</label>
+        <input type="text" id="clCompany" placeholder="e.g. Acme Corp">
+      </div>
+
+      <div class="field collapsible">
+        <button type="button" class="collapse-toggle" id="toggleCLJD">
+          Job Description
+          <span class="toggle-icon">+</span>
+        </button>
+        <div class="collapse-content" id="clJDContent">
+          <textarea id="clJobDescription" rows="4" placeholder="Paste the job description here..."></textarea>
+        </div>
+      </div>
+
+      <div class="field collapsible">
+        <button type="button" class="collapse-toggle" id="toggleCLInstructions">
+          Custom Instructions <span class="optional">(optional)</span>
+          <span class="toggle-icon">+</span>
+        </button>
+        <div class="collapse-content" id="clInstructionsContent">
+          <textarea id="clCustomInstructions" rows="2" placeholder="e.g. focus on my Python experience..."></textarea>
+        </div>
+      </div>
+
+      <div class="controls-row">
+        <div class="control-group">
+          <label for="toneSelectCL">Tone</label>
+          <select id="toneSelectCL">
+            <option value="professional-human">Professional & Human</option>
+            <option value="professional">Professional</option>
+            <option value="concise">Concise</option>
+            <option value="enthusiastic">Enthusiastic</option>
+          </select>
+        </div>
+        <div class="control-group">
+          <label for="lengthSelectCL">Length</label>
+          <select id="lengthSelectCL">
+            <option value="brief">Brief</option>
+            <option value="standard" selected>Standard</option>
+            <option value="detailed">Detailed</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="btn-row">
+        <button id="generateCLBtn" class="btn-primary btn-generate">
+          <span class="btn-text">Generate Cover Letter</span>
+          <span class="btn-loading" style="display: none;">Generating...</span>
+        </button>
+        <button id="clearCLBtn" class="btn-clear" title="Clear form">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+            <path d="M2.5 1a1 1 0 0 0-1 1v1a1 1 0 0 0 1 1H3v9a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V4h.5a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H10a1 1 0 0 0-1-1H7a1 1 0 0 0-1 1H2.5zm3 4a.5.5 0 0 1 .5.5v7a.5.5 0 0 1-1 0v-7a.5.5 0 0 1 .5-.5zM8 5a.5.5 0 0 1 .5.5v7a.5.5 0 0 1-1 0v-7A.5.5 0 0 1 8 5zm3 .5v7a.5.5 0 0 1-1 0v-7a.5.5 0 0 1 1 0z"/>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Output -->
+      <div id="clOutputSection" class="output-section" style="display: none;">
+        <div class="output-header">
+          <label>Generated Cover Letter</label>
+          <button id="copyCLBtn" class="btn-copy" title="Copy to clipboard">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+              <path d="M4 1.5H3a2 2 0 0 0-2 2V14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V3.5a2 2 0 0 0-2-2h-1v1h1a1 1 0 0 1 1 1V14a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3.5a1 1 0 0 1 1-1h1v-1z"/>
+              <path d="M9.5 1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-3a.5.5 0 0 1-.5-.5v-1a.5.5 0 0 1 .5-.5h3zm-3-1A1.5 1.5 0 0 0 5 1.5v1A1.5 1.5 0 0 0 6.5 4h3A1.5 1.5 0 0 0 11 2.5v-1A1.5 1.5 0 0 0 9.5 0h-3z"/>
+            </svg>
+            <span>Copy</span>
+          </button>
+        </div>
+        <div id="clOutput" class="output"></div>
+      </div>
+
+      <!-- Cover Letter Error -->
+      <div id="clErrorSection" class="error-section" style="display: none;">
+        <div class="error-header">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+            <path d="M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767L8.982 1.566zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5zm.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2z"/>
+          </svg>
+          <span>Error</span>
+        </div>
+        <p id="clErrorMessage"></p>
+      </div>
+    </main>
+
+    <!-- Analyzer Mode -->
+    <main id="analyzerMode" class="mode-content" style="display: none;">
+      <div class="field">
+        <label for="azCompany">Company Name <span class="optional">(optional)</span></label>
+        <input type="text" id="azCompany" placeholder="e.g. Acme Corp">
+      </div>
+
+      <div class="field">
+        <label for="azCompanyUrl">Company URL <span class="optional">(optional)</span></label>
+        <input type="url" id="azCompanyUrl" placeholder="e.g. https://acme.com">
+      </div>
+
+      <div class="field">
+        <label for="azJobDescription">Job Description</label>
+        <textarea id="azJobDescription" rows="5" placeholder="Paste the full job description here..."></textarea>
+      </div>
+
+      <div class="btn-row">
+        <button id="analyzeJobBtn" class="btn-primary btn-analyze-job">
+          <span class="btn-text">Analyze Job</span>
+          <span class="btn-loading" style="display: none;">Analyzing...</span>
+        </button>
+        <button id="clearAzBtn" class="btn-clear" title="Clear form">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+            <path d="M2.5 1a1 1 0 0 0-1 1v1a1 1 0 0 0 1 1H3v9a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V4h.5a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H10a1 1 0 0 0-1-1H7a1 1 0 0 0-1 1H2.5zm3 4a.5.5 0 0 1 .5.5v7a.5.5 0 0 1-1 0v-7a.5.5 0 0 1 .5-.5zM8 5a.5.5 0 0 1 .5.5v7a.5.5 0 0 1-1 0v-7A.5.5 0 0 1 8 5zm3 .5v7a.5.5 0 0 1-1 0v-7a.5.5 0 0 1 1 0z"/>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Company Info -->
+      <div id="azCompanySection" class="az-section" style="display: none;">
+        <div class="az-section-header">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+            <path d="M14 7h-1V2a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v5H2a1 1 0 0 0-1 1v5.5l1 .5h12l1-.5V8a1 1 0 0 0-1-1zM4 2h8v5H4V2zm-1 7h10v4H3V9z"/>
+          </svg>
+          <span>Company</span>
+        </div>
+        <div class="az-company-details" id="azCompanyDetails"></div>
+      </div>
+
+      <!-- Role Overview -->
+      <div id="azRoleSection" class="az-section" style="display: none;">
+        <div class="az-section-header">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+            <path d="M6.5 1A1.5 1.5 0 0 0 5 2.5V3H2a1 1 0 0 0-1 1v.793l3.5 2.5a1 1 0 0 0 1.143 0L8 5.082l2.357 1.711a1 1 0 0 0 1.143 0L15 3.793V4a1 1 0 0 0-1-1h-3v-.5A1.5 1.5 0 0 0 9.5 1h-3z"/>
+            <path d="M15 5.43V13a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V5.43l3.062 2.188a2 2 0 0 0 2.286 0L8 6.582l1.652 1.036a2 2 0 0 0 2.286 0L15 5.43z"/>
+          </svg>
+          <span>Role Overview</span>
+        </div>
+        <div id="azRoleDetails"></div>
+      </div>
+
+      <!-- Skills Analysis -->
+      <div id="azSkillsSection" class="az-section" style="display: none;">
+        <div class="az-section-header">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+            <path d="M2.5 0A1.5 1.5 0 0 0 1 1.5v13A1.5 1.5 0 0 0 2.5 16h11a1.5 1.5 0 0 0 1.5-1.5v-13A1.5 1.5 0 0 0 13.5 0h-11zM3 1h10a.5.5 0 0 1 .5.5V3H2.5V1.5A.5.5 0 0 1 3 1zm-1 3.5h12V13a.5.5 0 0 1-.5.5h-11A.5.5 0 0 1 2 13V4.5z"/>
+          </svg>
+          <span>Skills</span>
+        </div>
+        <div id="azSkillsContent"></div>
+      </div>
+
+      <!-- Strengths & Gaps -->
+      <div id="azStrengthsSection" class="az-section" style="display: none;">
+        <div class="az-section-header">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+            <path d="M8 1a2.5 2.5 0 0 1 2.5 2.5V4h-5v-.5A2.5 2.5 0 0 1 8 1zm3.5 3v-.5a3.5 3.5 0 1 0-7 0V4H1v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V4h-3.5z"/>
+          </svg>
+          <span>Strengths &amp; Gaps</span>
+        </div>
+        <div id="azStrengthsContent"></div>
+      </div>
+
+      <!-- Analyzer Error -->
+      <div id="azErrorSection" class="error-section" style="display: none;">
+        <div class="error-header">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+            <path d="M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767L8.982 1.566zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5zm.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2z"/>
+          </svg>
+          <span>Error</span>
+        </div>
+        <p id="azErrorMessage"></p>
       </div>
     </main>
   </div>

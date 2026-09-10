@@ -13,7 +13,7 @@ async function init() {
 async function loadHistory() {
   try {
     const response = await browser.runtime.sendMessage({ action: 'getHistory' });
-    
+
     if (response.success) {
       allHistory = response.history || [];
       renderHistory(allHistory);
@@ -26,14 +26,13 @@ async function loadHistory() {
 }
 
 function setupEventListeners() {
-  // Search
   document.getElementById('searchInput').addEventListener('input', (e) => {
     const query = e.target.value.toLowerCase().trim();
     if (query) {
-      const filtered = allHistory.filter(item => 
-        item.question.toLowerCase().includes(query) ||
+      const filtered = allHistory.filter(item =>
+        (item.question || '').toLowerCase().includes(query) ||
         (item.company && item.company.toLowerCase().includes(query)) ||
-        item.generatedAnswer.toLowerCase().includes(query) ||
+        (item.generatedAnswer || '').toLowerCase().includes(query) ||
         (item.pageTitle && item.pageTitle.toLowerCase().includes(query)) ||
         (item.pageUrl && item.pageUrl.toLowerCase().includes(query))
       );
@@ -43,32 +42,30 @@ function setupEventListeners() {
     }
   });
 
-  // Export
   document.getElementById('exportBtn').addEventListener('click', exportHistory);
 
-  // Import
   document.getElementById('importBtn').addEventListener('click', () => {
     document.getElementById('importFile').click();
   });
   document.getElementById('importFile').addEventListener('change', importHistory);
 
-  // Clear all
   document.getElementById('clearBtn').addEventListener('click', clearAllHistory);
 
-  // Modal close
   document.getElementById('closeModal').addEventListener('click', closeModal);
   document.getElementById('detailModal').addEventListener('click', (e) => {
     if (e.target === e.currentTarget) closeModal();
   });
 
-  // Modal actions
   document.getElementById('copyAnswerBtn').addEventListener('click', copyCurrentAnswer);
   document.getElementById('deleteEntryBtn').addEventListener('click', deleteCurrentEntry);
 
-  // Keyboard shortcuts
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') closeModal();
   });
+}
+
+function safeText(value) {
+  return value || '';
 }
 
 function renderHistory(history) {
@@ -83,29 +80,27 @@ function renderHistory(history) {
 
   emptyState.style.display = 'none';
 
-  // Group by date
   const groups = groupByDate(history);
-  
+
   let html = '';
   for (const [dateLabel, items] of Object.entries(groups)) {
     html += `<div class="date-group">`;
     html += `<div class="date-header">${dateLabel}</div>`;
-    
+
     for (const item of items) {
       const time = formatTime(new Date(item.timestamp));
       const isApplicationMode = item.source === 'application';
-      const badgeHtml = isApplicationMode 
-        ? `<span class="history-item-badge">Application</span>` 
+      const badgeHtml = isApplicationMode
+        ? `<span class="history-item-badge">Application</span>`
         : '';
-      const questionCountHtml = item.questionCount 
-        ? `<span class="history-item-count">${item.questionCount} Q&A</span>` 
+      const questionCountHtml = item.questionCount
+        ? `<span class="history-item-count">${item.questionCount} Q&A</span>`
         : '';
-      
-      // For application mode, show page title; for email mode, show question
-      const displayTitle = isApplicationMode 
+
+      const displayTitle = isApplicationMode
         ? (item.pageTitle || 'Page Analysis')
-        : truncate(item.question, 80);
-      
+        : truncate(item.question || 'Untitled', 80);
+
       html += `
         <div class="history-item ${isApplicationMode ? 'application-mode' : ''}" data-id="${item.id}">
           <div class="history-item-header">
@@ -118,35 +113,38 @@ function renderHistory(history) {
               <button class="btn-delete-item" data-id="${item.id}" title="Delete">×</button>
             </div>
           </div>
-          <div class="history-item-answer">${escapeHtml(truncate(item.generatedAnswer, 150))}</div>
+          <div class="history-item-answer">${escapeHtml(truncate(safeText(item.generatedAnswer), 150))}</div>
         </div>
       `;
     }
-    
+
     html += `</div>`;
   }
 
   container.innerHTML = html;
 
-  // Add click handlers for opening detail
   container.querySelectorAll('.history-item').forEach(el => {
     el.addEventListener('click', () => openDetail(el.dataset.id));
   });
 
-  // Add click handlers for delete buttons
   container.querySelectorAll('.btn-delete-item').forEach(btn => {
     btn.addEventListener('click', async (e) => {
       e.stopPropagation();
       const id = btn.dataset.id;
       if (!confirm('Delete this entry?')) return;
-      
+
       try {
-        await browser.runtime.sendMessage({
+        const response = await browser.runtime.sendMessage({
           action: 'deleteHistoryItem',
           id: id
         });
-        allHistory = allHistory.filter(h => h.id !== id);
-        renderHistory(allHistory);
+
+        if (response.success) {
+          allHistory = allHistory.filter(h => h.id !== id);
+          renderHistory(allHistory);
+        } else {
+          alert('Failed to delete: ' + (response.error || 'Unknown error'));
+        }
       } catch (error) {
         alert('Failed to delete: ' + error.message);
       }
@@ -166,13 +164,13 @@ function groupByDate(history) {
   for (const item of history) {
     const date = new Date(item.timestamp);
     const itemDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-    
+
     let label;
     if (itemDate.getTime() === today.getTime()) {
       label = 'Today';
     } else if (itemDate.getTime() === yesterday.getTime()) {
       label = 'Yesterday';
-    } else if (itemDate > weekAgo) {
+    } else if (itemDate < today && itemDate > weekAgo) {
       label = 'This Week';
     } else {
       label = date.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
@@ -194,18 +192,21 @@ function openDetail(id) {
   currentEntryId = id;
 
   const isApplicationMode = item.source === 'application';
-  
-  // Question / Title
-  document.getElementById('detailQuestion').textContent = item.question;
-  
-  // Source (for application mode)
+
+  document.getElementById('detailQuestion').textContent = safeText(item.question);
+
   const sourceSection = document.getElementById('detailSourceSection');
   if (isApplicationMode && item.pageUrl) {
     const url = item.pageUrl;
     if (url.startsWith('http://') || url.startsWith('https://')) {
-      document.getElementById('detailSource').innerHTML = `
-        <a href="${escapeHtml(url)}" target="_blank" rel="noopener">${escapeHtml(url)}</a>
-      `;
+      const link = document.createElement('a');
+      link.href = url;
+      link.textContent = url;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      const source = document.getElementById('detailSource');
+      source.innerHTML = '';
+      source.appendChild(link);
       sourceSection.style.display = 'block';
     } else {
       sourceSection.style.display = 'none';
@@ -213,8 +214,7 @@ function openDetail(id) {
   } else {
     sourceSection.style.display = 'none';
   }
-  
-  // Company
+
   const companySection = document.getElementById('detailCompanySection');
   if (item.company) {
     document.getElementById('detailCompany').textContent = item.company;
@@ -223,7 +223,6 @@ function openDetail(id) {
     companySection.style.display = 'none';
   }
 
-  // Job Description
   const jdSection = document.getElementById('detailJDSection');
   if (item.jobDescription) {
     document.getElementById('detailJD').textContent = item.jobDescription;
@@ -232,17 +231,15 @@ function openDetail(id) {
     jdSection.style.display = 'none';
   }
 
-  // Questions list (for application mode with multiple Q&A)
   const questionsListSection = document.getElementById('detailQuestionsListSection');
   if (isApplicationMode && item.questions && item.questions.length > 0) {
     document.getElementById('detailQuestionCount').textContent = item.questions.length;
     renderDetailQuestions(item.questions);
     questionsListSection.style.display = 'block';
-    // Hide the single answer section when we have multiple Q&A
     document.getElementById('detailAnswerSection').style.display = 'none';
   } else {
     questionsListSection.style.display = 'none';
-    document.getElementById('detailAnswer').textContent = item.generatedAnswer;
+    document.getElementById('detailAnswer').textContent = safeText(item.generatedAnswer);
     document.getElementById('detailAnswerSection').style.display = 'block';
   }
 
@@ -252,22 +249,21 @@ function openDetail(id) {
 function renderDetailQuestions(questions) {
   const container = document.getElementById('detailQuestionsList');
   container.innerHTML = '';
-  
+
   questions.forEach((q, index) => {
     const item = document.createElement('div');
     item.className = 'detail-qa-item';
     item.innerHTML = `
       <div class="detail-qa-question">
         <span class="detail-qa-number">${index + 1}.</span>
-        <span>${escapeHtml(q.question)}</span>
+        <span>${escapeHtml(safeText(q.question))}</span>
       </div>
-      <div class="detail-qa-answer">${escapeHtml(q.answer)}</div>
+      <div class="detail-qa-answer">${escapeHtml(safeText(q.answer))}</div>
       <button class="btn-copy-small" data-index="${index}">Copy</button>
     `;
     container.appendChild(item);
   });
-  
-  // Add copy listeners
+
   container.querySelectorAll('.btn-copy-small').forEach(btn => {
     btn.addEventListener('click', async (e) => {
       e.stopPropagation();
@@ -275,27 +271,18 @@ function renderDetailQuestions(questions) {
       const answer = questions[idx]?.answer || '';
       try {
         await navigator.clipboard.writeText(answer);
-        btn.textContent = 'Copied!';
-        setTimeout(() => {
-          btn.textContent = 'Copy';
-        }, 1500);
       } catch {
-        // Fallback
         const textArea = document.createElement('textarea');
         textArea.value = answer;
         document.body.appendChild(textArea);
         textArea.select();
-        try {
-          document.execCommand('copy');
-        } catch (err) {
-          console.error('Fallback copy failed:', err);
-        }
+        document.execCommand('copy');
         document.body.removeChild(textArea);
-        btn.textContent = 'Copied!';
-        setTimeout(() => {
-          btn.textContent = 'Copy';
-        }, 1500);
       }
+      btn.textContent = 'Copied!';
+      setTimeout(() => {
+        btn.textContent = 'Copy';
+      }, 2000);
     });
   });
 }
@@ -308,48 +295,45 @@ function closeModal() {
 async function copyCurrentAnswer() {
   const item = allHistory.find(h => h.id === currentEntryId);
   if (!item) return;
-  
+
   const button = document.getElementById('copyAnswerBtn');
-  
-  // For application mode with multiple Q&A, copy all
-  let textToCopy = item.generatedAnswer;
-  
+  const textToCopy = safeText(item.generatedAnswer);
+
   try {
     await navigator.clipboard.writeText(textToCopy);
-    button.textContent = 'Copied!';
-    setTimeout(() => {
-      button.textContent = 'Copy Answer';
-    }, 2000);
   } catch {
-    // Fallback
     const textArea = document.createElement('textarea');
     textArea.value = textToCopy;
     document.body.appendChild(textArea);
     textArea.select();
     document.execCommand('copy');
     document.body.removeChild(textArea);
-    
-    button.textContent = 'Copied!';
-    setTimeout(() => {
-      button.textContent = 'Copy Answer';
-    }, 2000);
   }
+
+  button.textContent = 'Copied!';
+  setTimeout(() => {
+    button.textContent = 'Copy Answer';
+  }, 2000);
 }
 
 async function deleteCurrentEntry() {
   if (!currentEntryId) return;
-  
+
   if (!confirm('Delete this entry?')) return;
 
   try {
-    await browser.runtime.sendMessage({
+    const response = await browser.runtime.sendMessage({
       action: 'deleteHistoryItem',
       id: currentEntryId
     });
 
-    allHistory = allHistory.filter(h => h.id !== currentEntryId);
-    renderHistory(allHistory);
-    closeModal();
+    if (response.success) {
+      allHistory = allHistory.filter(h => h.id !== currentEntryId);
+      renderHistory(allHistory);
+      closeModal();
+    } else {
+      alert('Failed to delete: ' + (response.error || 'Unknown error'));
+    }
   } catch (error) {
     alert('Failed to delete: ' + error.message);
   }
@@ -358,17 +342,19 @@ async function deleteCurrentEntry() {
 async function exportHistory() {
   try {
     const response = await browser.runtime.sendMessage({ action: 'exportHistory' });
-    
+
     if (response.success) {
       const blob = new Blob([response.data], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
-      
+
       const a = document.createElement('a');
       a.href = url;
       a.download = `aiply-history-${new Date().toISOString().split('T')[0]}.json`;
       a.click();
-      
-      URL.revokeObjectURL(url);
+
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } else {
+      alert('Export failed: ' + (response.error || 'Unknown error'));
     }
   } catch (error) {
     alert('Export failed: ' + error.message);
@@ -381,9 +367,14 @@ async function clearAllHistory() {
   }
 
   try {
-    await browser.runtime.sendMessage({ action: 'clearHistory' });
-    allHistory = [];
-    renderHistory([]);
+    const response = await browser.runtime.sendMessage({ action: 'clearHistory' });
+
+    if (response.success) {
+      allHistory = [];
+      renderHistory([]);
+    } else {
+      alert('Failed to clear history: ' + (response.error || 'Unknown error'));
+    }
   } catch (error) {
     alert('Failed to clear history: ' + error.message);
   }
@@ -392,46 +383,32 @@ async function clearAllHistory() {
 async function importHistory(event) {
   const file = event.target.files[0];
   if (!file) return;
-  
+
   try {
     const text = await file.text();
     const importedHistory = JSON.parse(text);
-    
+
     if (!Array.isArray(importedHistory)) {
       throw new Error('Invalid history file format. Expected an array.');
     }
-    
-    const existingIds = new Set(allHistory.map(item => item.id));
-    
-    const newItems = importedHistory.filter(item => {
-      if (!item.id || !item.timestamp || !item.question) {
-        return false;
-      }
-      return !existingIds.has(item.id);
+
+    const response = await browser.runtime.sendMessage({
+      action: 'importHistory',
+      data: { history: importedHistory }
     });
-    
-    if (newItems.length === 0) {
-      alert('No new items to import. All items already exist in history.');
-      event.target.value = '';
-      return;
+
+    if (response.success) {
+      allHistory = await browser.runtime.sendMessage({ action: 'getHistory' });
+      allHistory = allHistory.history || [];
+      renderHistory(allHistory);
+      alert(`Successfully imported ${response.count || 0} item(s).`);
+    } else {
+      alert('Import failed: ' + (response.error || 'Unknown error'));
     }
-    
-    const mergedHistory = [...allHistory, ...newItems];
-    
-    mergedHistory.sort((a, b) => {
-      return new Date(b.timestamp) - new Date(a.timestamp);
-    });
-    
-    await browser.storage.local.set({ history: mergedHistory });
-    
-    allHistory = mergedHistory;
-    renderHistory(allHistory);
-    
-    alert(`Successfully imported ${newItems.length} item(s).`);
   } catch (error) {
     alert('Import failed: ' + error.message);
   }
-  
+
   event.target.value = '';
 }
 
@@ -445,6 +422,7 @@ function formatTime(date) {
 }
 
 function truncate(str, length) {
+  if (!str) return '';
   if (str.length <= length) return str;
   return str.substring(0, length) + '...';
 }

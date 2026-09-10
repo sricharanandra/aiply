@@ -134,7 +134,7 @@ View and manage all your generated answers:
 
 ## Rate Limits
 
-**Groq API** (free tier): ~30 requests/minute
+**Groq API** (Developer Plan): ~1,000 requests/minute
 
 **GitHub API**:
 - Without token: 60 requests/hour

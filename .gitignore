@@ -1,0 +1,18 @@
+# AI assistant config (never push these)
+AGENTS.md
+CLAUDE.md
+.opencode/
+.claude/
+.cursorrules
+.aider*
+
+# OS/IDE
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+.vscode/
+.idea/
+
+# Build output
+*.zip

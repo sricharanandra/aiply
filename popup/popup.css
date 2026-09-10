@@ -197,6 +197,65 @@ textarea::placeholder {
 
 .collapse-content {
   margin-top: 8px;
+  display: none;
+}
+
+.collapse-content.open {
+  display: block;
+}
+
+/* Controls Row (Tone/Length) */
+.controls-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.control-group {
+  flex: 1;
+}
+
+.control-group label {
+  display: block;
+  font-size: 11px;
+  font-weight: 500;
+  color: #777;
+  margin-bottom: 4px;
+}
+
+.control-group select {
+  width: 100%;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-family: inherit;
+  background: #1a1a1a;
+  border: 1px solid #2a2a2a;
+  border-radius: 6px;
+  color: #e0e0e0;
+  cursor: pointer;
+  transition: border-color 0.15s;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12' fill='%23666'%3E%3Cpath d='M3 5l3 3 3-3'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  padding-right: 28px;
+}
+
+.control-group select:hover {
+  border-color: #444;
+}
+
+.control-group select:focus {
+  outline: none;
+  border-color: #4a9eff;
+}
+
+.control-group select option {
+  background: #1a1a1a;
+  color: #e0e0e0;
+  padding: 4px;
 }
 
 /* Buttons */
@@ -656,6 +715,11 @@ textarea::placeholder {
 }
 
 /* Scrollbar */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #333 #1a1a1a;
+}
+
 ::-webkit-scrollbar {
   width: 6px;
 }
@@ -739,7 +803,7 @@ textarea::placeholder {
   margin: 0;
 }
 
-/* Profile Field Item - Updated */
+/* Profile Field Item */
 .profile-field-item {
   display: flex;
   align-items: center;
@@ -870,4 +934,212 @@ textarea::placeholder {
 .profile-summary-row .btn-copy-small {
   flex-shrink: 0;
 }
+
+/* Analyzer Mode Styles */
+
+.az-section {
+  margin-bottom: 16px;
+  padding: 12px;
+  background: #1a1a1a;
+  border: 1px solid #2a2a2a;
+  border-radius: 8px;
+}
+
+.az-section-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #aaa;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.az-section-header svg {
+  color: #555;
+}
+
+.az-company-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: #fff;
+  margin-bottom: 4px;
+}
+
+.az-company-desc {
+  font-size: 12px;
+  color: #999;
+  line-height: 1.5;
+  margin-bottom: 8px;
+}
+
+.az-company-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.az-tag {
+  display: inline-block;
+  padding: 3px 8px;
+  font-size: 10px;
+  font-weight: 500;
+  background: #2a2a2a;
+  border-radius: 4px;
+  color: #888;
+}
+
+.az-role-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #fff;
+  margin-bottom: 6px;
+}
+
+.az-role-summary {
+  font-size: 12px;
+  color: #999;
+  line-height: 1.5;
+  margin-bottom: 10px;
+}
+
+.az-subsection {
+  margin-top: 12px;
+}
+
+.az-subsection:first-child {
+  margin-top: 0;
+}
+
+.az-subsection-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: #777;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  margin-bottom: 6px;
+}
+
+.az-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.az-list li {
+  position: relative;
+  padding: 4px 0 4px 14px;
+  font-size: 12px;
+  color: #aaa;
+  line-height: 1.5;
+}
+
+.az-list li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 11px;
+  width: 5px;
+  height: 5px;
+  background: #444;
+  border-radius: 50%;
+}
+
+.az-strengths-title {
+  color: #4aff8a;
+}
+
+.az-gaps-title {
+  color: #ff6a4a;
+}
+
+.az-strengths-list li::before {
+  background: #4aff8a66;
+}
+
+.az-gaps-list li::before {
+  background: #ff6a4a66;
+}
+
+.az-skills-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.az-skill-item {
+  padding: 8px 10px;
+  background: #151515;
+  border: 1px solid #2a2a2a;
+  border-radius: 6px;
+  border-left: 3px solid #444;
+}
+
+.az-skill-item.az-skill-match {
+  border-left-color: #4aff4a66;
+}
+
+.az-skill-item.az-skill-partial {
+  border-left-color: #ffaa4a66;
+}
+
+.az-skill-item.az-skill-gap {
+  border-left-color: #ff4a4a66;
+}
+
+.az-skill-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 2px;
+}
+
+.az-skill-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: #ddd;
+}
+
+.az-skill-category {
+  font-size: 10px;
+  color: #666;
+  font-style: italic;
+}
+
+.az-skill-badge {
+  margin-left: auto;
+  padding: 1px 6px;
+  font-size: 9px;
+  font-weight: 600;
+  border-radius: 3px;
+  text-transform: uppercase;
+}
+
+.az-skill-match .az-skill-badge {
+  background: #1a3a1a;
+  color: #4aff4a;
+}
+
+.az-skill-partial .az-skill-badge {
+  background: #3a2a1a;
+  color: #ffaa4a;
+}
+
+.az-skill-gap .az-skill-badge {
+  background: #3a1a1a;
+  color: #ff4a4a;
+}
+
+.az-skill-evidence {
+  font-size: 11px;
+  color: #777;
+  line-height: 1.4;
+}
+
+.btn-analyze-job {
+  margin-top: 0;
+}
+
 
