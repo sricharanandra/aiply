@@ -10,6 +10,10 @@ const DEFAULT_HISTORY_RETENTION_DAYS = 90;
 const GROQ_MODEL_STANDARD = 'openai/gpt-oss-120b';
 const GROQ_MODEL_FAST = 'openai/gpt-oss-20b';
 
+const DEFAULT_OPENCODE_BASE_URL = 'http://127.0.0.1:4096';
+const DEFAULT_OPENCODE_USERNAME = 'opencode';
+const FETCH_TIMEOUT_OPENCODE = 120000;
+
 const FETCH_TIMEOUT_GROQ = 60000;
 const FETCH_TIMEOUT_GITHUB = 20000;
 
@@ -240,6 +244,12 @@ async function handleMessage(message) {
       return await regenerateAnswer(message.data);
     case 'analyzeJob':
       return await analyzeJobDescription(message.data);
+    case 'parseResume':
+      return await parseResume(message.data);
+    case 'testOpenCode':
+      return await testOpenCode(message.data);
+    case 'listOpenCodeModels':
+      return await listOpenCodeModels(message.data);
     case 'refreshCache':
       return await forceRefreshCache();
     case 'getProfile':
@@ -277,9 +287,7 @@ async function generateAnswer(data) {
   }
 
   const settings = await getSettings();
-  if (!settings.groqApiKey) {
-    throw new Error('Groq API key not set. Go to Settings to add your free API key.');
-  }
+  requireProvider(settings);
 
   const profile = await getProfile();
   const cache = await getCache();
@@ -309,7 +317,8 @@ async function generateAnswer(data) {
     { role: 'user', content: userMessage }
   ];
 
-  const response = await callGroqAPI(settings.groqApiKey, model, messages, 0.6, maxTokens, 'low');
+  const result = await callLLM(settings, { groqModel: model, messages, temperature: 0.6, maxTokens, reasoningEffort: 'low' });
+  const response = result.text;
 
   await saveToHistory({
     question,
@@ -319,7 +328,7 @@ async function generateAnswer(data) {
     tone: tone || null,
     length: length || null,
     generatedAnswer: response,
-    modelUsed: model
+    modelUsed: result.modelUsed
   });
 
   return { success: true, answer: response };
@@ -339,9 +348,7 @@ async function generateCoverLetter(data) {
   }
 
   const settings = await getSettings();
-  if (!settings.groqApiKey) {
-    throw new Error('Groq API key not set. Go to Settings to add your free API key.');
-  }
+  requireProvider(settings);
 
   const profile = await getProfile();
   const cache = await getCache();
@@ -362,7 +369,8 @@ async function generateCoverLetter(data) {
     { role: 'user', content: userMessage }
   ];
 
-  const response = await callGroqAPI(settings.groqApiKey, GROQ_MODEL_STANDARD, messages, 0.6, maxTokens, 'low');
+  const result = await callLLM(settings, { groqModel: GROQ_MODEL_STANDARD, messages, temperature: 0.6, maxTokens, reasoningEffort: 'low' });
+  const response = result.text;
 
   await saveToHistory({
     question: `Cover Letter for ${company}`,
@@ -372,7 +380,7 @@ async function generateCoverLetter(data) {
     tone: tone || null,
     length: length || null,
     generatedAnswer: response,
-    modelUsed: GROQ_MODEL_STANDARD,
+    modelUsed: result.modelUsed,
     source: 'cover-letter'
   });
 
@@ -393,9 +401,7 @@ async function analyzePageQuestions(data) {
   }
 
   const settings = await getSettings();
-  if (!settings.groqApiKey) {
-    throw new Error('Groq API key not set. Go to Settings to add your API key.');
-  }
+  requireProvider(settings);
 
   const profile = await getProfile();
   const cache = await getCache();
@@ -423,7 +429,8 @@ Return ONLY a JSON array. No explanation, no markdown, just the JSON array.`;
     { role: 'user', content: userMessage }
   ];
 
-  const response = await callGroqAPI(settings.groqApiKey, GROQ_MODEL_STANDARD, messages, 0.5, 4000, 'low');
+  const result = await callLLM(settings, { groqModel: GROQ_MODEL_STANDARD, messages, temperature: 0.5, maxTokens: 4000, reasoningEffort: 'low' });
+  const response = result.text;
 
   let questions;
   try {
@@ -432,7 +439,7 @@ Return ONLY a JSON array. No explanation, no markdown, just the JSON array.`;
       throw new Error('Response is not an array');
     }
   } catch (parseError) {
-    console.error('Failed to parse Groq response:', response);
+    console.error('Failed to parse AI response:', response);
     throw new Error('Failed to parse AI response. Please try again.');
   }
 
@@ -451,7 +458,7 @@ Return ONLY a JSON array. No explanation, no markdown, just the JSON array.`;
       jobDescription: null,
       customInstructions: null,
       generatedAnswer: validQAs.map(q => `Q: ${q.question}\nA: ${q.answer}`).join('\n\n---\n\n'),
-      modelUsed: GROQ_MODEL_STANDARD,
+      modelUsed: result.modelUsed,
       source: 'application',
       pageUrl,
       pageTitle,
@@ -473,9 +480,7 @@ async function analyzeJobDescription(data) {
   }
 
   const settings = await getSettings();
-  if (!settings.groqApiKey) {
-    throw new Error('Groq API key not set. Go to Settings to add your API key.');
-  }
+  requireProvider(settings);
 
   const profile = await getProfile();
   const cache = await getCache();
@@ -502,7 +507,7 @@ async function analyzeJobDescription(data) {
     { role: 'user', content: userMessage }
   ];
 
-  const response = await callGroqAPI(settings.groqApiKey, GROQ_MODEL_STANDARD, messages, 0.5, 2000, 'medium');
+  const response = (await callLLM(settings, { groqModel: GROQ_MODEL_STANDARD, messages, temperature: 0.5, maxTokens: 2000, reasoningEffort: 'medium' })).text;
 
   let analysis;
   try {
@@ -511,7 +516,7 @@ async function analyzeJobDescription(data) {
       throw new Error('Response is not an object');
     }
   } catch (parseError) {
-    console.error('Failed to parse Groq response:', response);
+    console.error('Failed to parse AI response:', response);
     throw new Error('Failed to parse analysis. Please try again.');
   }
 
@@ -633,9 +638,7 @@ async function regenerateAnswer(data) {
   }
 
   const settings = await getSettings();
-  if (!settings.groqApiKey) {
-    throw new Error('Groq API key not set.');
-  }
+  requireProvider(settings);
 
   const profile = await getProfile();
   const cache = await getCache();
@@ -669,7 +672,7 @@ async function regenerateAnswer(data) {
     { role: 'user', content: userMessage }
   ];
 
-  const response = await callGroqAPI(settings.groqApiKey, model, messages, 0.6, maxTokens, 'low');
+  const response = (await callLLM(settings, { groqModel: model, messages, temperature: 0.6, maxTokens, reasoningEffort: 'low' })).text;
 
   return { success: true, answer: response };
 }
@@ -901,6 +904,259 @@ async function callGroqAPI(apiKey, model, messages, temperature = 0.6, maxComple
   }
 
   return content || '';
+}
+
+// === LLM Provider (Groq / OpenCode local) ===
+
+function requireProvider(settings) {
+  const provider = settings.llmProvider || 'groq';
+  if (provider === 'opencode') {
+    if (!settings.opencodeBaseUrl || !settings.opencodeBaseUrl.trim()) {
+      throw new Error('OpenCode server URL not set. Go to Settings to configure it.');
+    }
+    if (!settings.opencodeModel || !settings.opencodeModel.trim()) {
+      throw new Error('OpenCode model not set. Go to Settings, refresh models, and pick one.');
+    }
+    return;
+  }
+  if (!settings.groqApiKey) {
+    throw new Error('Groq API key not set. Go to Settings to add your free API key, or switch provider to OpenCode.');
+  }
+}
+
+async function callLLM(settings, { groqModel, messages, temperature = 0.6, maxTokens = 2000, reasoningEffort = 'low' }) {
+  const provider = settings.llmProvider || 'groq';
+  if (provider === 'opencode') {
+    return await callOpenCodeWithFallbacks(settings, messages);
+  }
+  const text = await callGroqAPI(settings.groqApiKey, groqModel, messages, temperature, maxTokens, reasoningEffort);
+  return { text, modelUsed: groqModel };
+}
+
+function opencodeHeaders(settings) {
+  const headers = { 'Content-Type': 'application/json' };
+  if (settings.opencodePassword) {
+    const user = (settings.opencodeUsername || DEFAULT_OPENCODE_USERNAME).trim() || DEFAULT_OPENCODE_USERNAME;
+    headers['Authorization'] = 'Basic ' + btoa(`${user}:${settings.opencodePassword}`);
+  }
+  return headers;
+}
+
+function opencodeBase(settings) {
+  return (settings.opencodeBaseUrl || DEFAULT_OPENCODE_BASE_URL).trim().replace(/\/+$/, '');
+}
+
+async function opencodeFetch(settings, path, { method = 'GET', body, timeoutMs = FETCH_TIMEOUT_OPENCODE } = {}) {
+  const url = opencodeBase(settings) + path;
+  const options = { method, headers: opencodeHeaders(settings) };
+  if (body !== undefined) {
+    options.body = JSON.stringify(body);
+  }
+  let response;
+  try {
+    response = await fetchWithTimeout(url, options, timeoutMs);
+  } catch (error) {
+    if (error.name === 'AbortError') {
+      throw new Error(`OpenCode server timed out at ${opencodeBase(settings)}. The model may be slow; try again.`);
+    }
+    throw new Error(`OpenCode server unreachable at ${opencodeBase(settings)}. Start it with: opencode serve --port 4096`);
+  }
+  if (response.status === 401) {
+    throw new Error('OpenCode rejected the credentials (401). Check username/password in Settings.');
+  }
+  if (!response.ok) {
+    const detail = await response.text().catch(() => '');
+    throw new Error(`OpenCode error (${response.status}): ${detail.substring(0, 200) || response.statusText}`);
+  }
+  return response;
+}
+
+function splitOpenCodeModel(modelId) {
+  const cleaned = (modelId || '').trim();
+  const slash = cleaned.indexOf('/');
+  if (slash === -1) {
+    throw new Error(`Bad OpenCode model "${cleaned}". Use provider/model format, e.g. opencode/big-pickle.`);
+  }
+  return { providerID: cleaned.substring(0, slash), modelID: cleaned.substring(slash + 1) };
+}
+
+function extractOpenCodeText(data) {
+  const parts = data && data.parts;
+  if (!Array.isArray(parts)) return '';
+  const texts = [];
+  for (const part of parts) {
+    if (!part || typeof part !== 'object') continue;
+    if (part.type === 'text' && typeof part.text === 'string' && part.text.trim()) {
+      texts.push(part.text);
+    } else if (typeof part.data === 'string' && part.data.trim()) {
+      texts.push(part.data);
+    } else if (typeof part.content === 'string' && part.content.trim()) {
+      texts.push(part.content);
+    }
+  }
+  return texts.join('\n').trim();
+}
+
+async function callOpenCodeOnce(settings, modelId, systemContent, userContent) {
+  const { providerID, modelID } = splitOpenCodeModel(modelId);
+  const sessionRes = await opencodeFetch(settings, '/session', {
+    method: 'POST',
+    body: { title: 'aiply' }
+  });
+  const session = await sessionRes.json();
+  const sessionId = session && (session.id || session.ID || session.sessionID);
+  if (!sessionId) {
+    throw new Error('OpenCode did not return a session id.');
+  }
+  try {
+    const msgRes = await opencodeFetch(settings, `/session/${encodeURIComponent(sessionId)}/message`, {
+      method: 'POST',
+      body: {
+        system: systemContent,
+        model: { providerID, modelID },
+        parts: [{ type: 'text', text: userContent }]
+      }
+    });
+    const data = await msgRes.json();
+    const text = extractOpenCodeText(data);
+    if (!text) {
+      throw new Error(`OpenCode model "${modelId}" returned no text. It may be removed or overloaded; pick another model.`);
+    }
+    return text;
+  } catch (error) {
+    throw error;
+  } finally {
+    opencodeFetch(settings, `/session/${encodeURIComponent(sessionId)}`, { method: 'DELETE', timeoutMs: 5000 }).catch(() => {});
+  }
+}
+
+async function callOpenCodeWithFallbacks(settings, messages) {
+  const systemContent = messages.filter(m => m.role === 'system').map(m => m.content).join('\n\n');
+  const userContent = messages.filter(m => m.role !== 'system').map(m => m.content).join('\n\n');
+  const candidates = [settings.opencodeModel, ...(settings.opencodeFallbacks || [])]
+    .map(m => (m || '').trim())
+    .filter(Boolean);
+  if (candidates.length === 0) {
+    throw new Error('No OpenCode model configured. Go to Settings, refresh models, and pick one.');
+  }
+  const tried = [];
+  for (const modelId of candidates) {
+    try {
+      const text = await callOpenCodeOnce(settings, modelId, systemContent, userContent);
+      return { text, modelUsed: `opencode/${modelId}` };
+    } catch (error) {
+      tried.push(`${modelId} (${error.message})`);
+    }
+  }
+  throw new Error(`All OpenCode models failed. Tried: ${tried.join('; ')}. Refresh models in Settings; free Zen models change often.`);
+}
+
+async function testOpenCode(data) {
+  const settings = data && (data.baseUrl || data.opencodeBaseUrl)
+    ? {
+        opencodeBaseUrl: data.baseUrl || data.opencodeBaseUrl,
+        opencodeUsername: data.username || data.opencodeUsername,
+        opencodePassword: data.password !== undefined ? data.password : data.opencodePassword
+      }
+    : await getSettings();
+  const response = await opencodeFetch(settings, '/global/health', { timeoutMs: 10000 });
+  const health = await response.json().catch(() => ({}));
+  return { success: true, healthy: health.healthy !== false, version: health.version || null };
+}
+
+async function listOpenCodeModels(data) {
+  const settings = data && (data.baseUrl || data.opencodeBaseUrl)
+    ? {
+        opencodeBaseUrl: data.baseUrl || data.opencodeBaseUrl,
+        opencodeUsername: data.username || data.opencodeUsername,
+        opencodePassword: data.password !== undefined ? data.password : data.opencodePassword
+      }
+    : await getSettings();
+  const response = await opencodeFetch(settings, '/config/providers', { timeoutMs: 15000 });
+  const config = await response.json().catch(() => ({}));
+  return { success: true, providers: config.providers || [], defaults: config.default || {} };
+}
+
+const RESUME_EXTRACT_PROMPT = `You extract structured profile data from a resume. Return ONLY a JSON object. No explanation, no markdown.
+
+Rules:
+- Use "" for unknown text fields and [] for unknown lists. NEVER invent values.
+- emails, phones, urls: copy exactly as written.
+- githubUsername: just the username, not the full URL.
+- otherContext: one short paragraph of anything useful not covered elsewhere, or "".
+
+Schema:
+{"firstName":"","middleName":"","lastName":"","email":"","phone":"","linkedinUrl":"","githubUsername":"","twitterUrl":"","portfolioUrl":"","otherLinks":[],"deployedProjects":[],"researchPapers":[],"certifications":[],"achievements":[],"otherContext":""}
+
+List items use {"name":..,"url":..} for links/projects and {"title":..,"description":..,"url":..} for research/certs/achievements.`;
+
+async function parseResume(data) {
+  const resumeText = data && data.resumeText ? data.resumeText.trim() : '';
+
+  if (!resumeText) {
+    throw new Error('No resume text to scan. Upload a resume first.');
+  }
+
+  const settings = await getSettings();
+  requireProvider(settings);
+
+  const cap = 6000;
+  const capped = resumeText.length > cap ? resumeText.substring(0, cap) + '\n...(truncated)' : resumeText;
+
+  const messages = [
+    { role: 'system', content: RESUME_EXTRACT_PROMPT },
+    { role: 'user', content: `=== RESUME ===\n${capped}\n=== END RESUME ===\n\nExtract the profile data as JSON.` }
+  ];
+
+  const result = await callLLM(settings, { groqModel: GROQ_MODEL_FAST, messages, temperature: 0.3, maxTokens: 2000, reasoningEffort: 'low' });
+
+  let extracted;
+  try {
+    extracted = parseJSONObject(result.text);
+  } catch (parseError) {
+    console.error('Failed to parse resume extraction:', result.text);
+    throw new Error('Could not read the resume. Try again.');
+  }
+
+  return { success: true, extracted: sanitizeExtractedProfile(extracted), modelUsed: result.modelUsed };
+}
+
+function sanitizeExtractedProfile(raw) {
+  const source = raw && typeof raw === 'object' ? raw : {};
+  const cleanStr = value => (typeof value === 'string' ? value.trim() : '');
+  const cleanLinkList = value => {
+    if (!Array.isArray(value)) return [];
+    return value
+      .filter(item => item && typeof item === 'object' && (item.url || item.name))
+      .map(item => ({ name: cleanStr(item.name), url: cleanStr(item.url) }))
+      .filter(item => item.url)
+      .slice(0, 20);
+  };
+  const cleanContextList = value => {
+    if (!Array.isArray(value)) return [];
+    return value
+      .filter(item => item && typeof item === 'object' && (item.title || item.description))
+      .map(item => ({ title: cleanStr(item.title), description: cleanStr(item.description), url: cleanStr(item.url) || null }))
+      .filter(item => item.title)
+      .slice(0, 20);
+  };
+  return {
+    firstName: cleanStr(source.firstName),
+    middleName: cleanStr(source.middleName),
+    lastName: cleanStr(source.lastName),
+    email: cleanStr(source.email),
+    phone: cleanStr(source.phone),
+    linkedinUrl: cleanStr(source.linkedinUrl),
+    githubUsername: cleanStr(source.githubUsername),
+    twitterUrl: cleanStr(source.twitterUrl),
+    portfolioUrl: cleanStr(source.portfolioUrl),
+    otherLinks: cleanLinkList(source.otherLinks),
+    deployedProjects: cleanLinkList(source.deployedProjects),
+    researchPapers: cleanContextList(source.researchPapers),
+    certifications: cleanContextList(source.certifications),
+    achievements: cleanContextList(source.achievements),
+    otherContext: cleanStr(source.otherContext)
+  };
 }
 
 // === GitHub Cache ===
@@ -1177,7 +1433,13 @@ async function getSettings() {
   return storage.settings || {
     groqApiKey: '',
     githubToken: '',
-    historyRetentionDays: DEFAULT_HISTORY_RETENTION_DAYS
+    historyRetentionDays: DEFAULT_HISTORY_RETENTION_DAYS,
+    llmProvider: 'groq',
+    opencodeBaseUrl: DEFAULT_OPENCODE_BASE_URL,
+    opencodeUsername: DEFAULT_OPENCODE_USERNAME,
+    opencodePassword: '',
+    opencodeModel: '',
+    opencodeFallbacks: []
   };
 }
 

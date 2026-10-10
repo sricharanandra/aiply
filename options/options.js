@@ -22,6 +22,108 @@ async function loadSettings() {
   document.getElementById('apiKey').value = settings.groqApiKey || '';
   document.getElementById('githubToken').value = settings.githubToken || '';
   document.getElementById('historyRetention').value = settings.historyRetentionDays || 90;
+
+  const provider = settings.llmProvider || 'groq';
+  document.getElementById(provider === 'opencode' ? 'providerOpencode' : 'providerGroq').checked = true;
+  document.getElementById('opencodeBaseUrl').value = settings.opencodeBaseUrl || 'http://127.0.0.1:4096';
+  document.getElementById('opencodeUsername').value = settings.opencodeUsername || 'opencode';
+  document.getElementById('opencodePassword').value = '';
+  if (settings.opencodePassword) {
+    document.getElementById('opencodePassword').placeholder = 'Saved (leave blank to keep)';
+  }
+  document.getElementById('opencodeModel').value = settings.opencodeModel || '';
+  document.getElementById('opencodeFallbacks').value = (settings.opencodeFallbacks || []).join('\n');
+  updateProviderVisibility();
+}
+
+function updateProviderVisibility() {
+  const useOpencode = document.getElementById('providerOpencode').checked;
+  document.getElementById('groqFields').style.display = useOpencode ? 'none' : 'block';
+  document.getElementById('opencodeFields').style.display = useOpencode ? 'block' : 'none';
+}
+
+async function getOpenCodeCreds() {
+  const passwordInput = document.getElementById('opencodePassword').value;
+  let password = passwordInput;
+  if (!password) {
+    const stored = await browser.runtime.sendMessage({ action: 'getSettings' });
+    password = (stored && stored.opencodePassword) || '';
+  }
+  return {
+    baseUrl: document.getElementById('opencodeBaseUrl').value.trim() || 'http://127.0.0.1:4096',
+    username: document.getElementById('opencodeUsername').value.trim() || 'opencode',
+    password
+  };
+}
+
+async function testOpencodeConnection() {
+  const button = document.getElementById('testOpencode');
+  const status = document.getElementById('opencodeStatus');
+  button.disabled = true;
+  status.textContent = 'Testing...';
+  try {
+    const response = await browser.runtime.sendMessage({ action: 'testOpenCode', data: await getOpenCodeCreds() });
+    if (response && response.success) {
+      status.textContent = `Connected${response.version ? ' (v' + response.version + ')' : ''}.`;
+    } else {
+      status.textContent = `Failed: ${(response && response.error) || 'unknown error'}`;
+    }
+  } catch (error) {
+    status.textContent = `Failed: ${error.message}`;
+  } finally {
+    button.disabled = false;
+  }
+}
+
+async function refreshOpenCodeModels() {
+  const button = document.getElementById('refreshModels');
+  const status = document.getElementById('opencodeStatus');
+  button.disabled = true;
+  status.textContent = 'Loading models...';
+  try {
+    const response = await browser.runtime.sendMessage({ action: 'listOpenCodeModels', data: await getOpenCodeCreds() });
+    if (!response || !response.success) {
+      status.textContent = `Failed: ${(response && response.error) || 'unknown error'}`;
+      return;
+    }
+    const providers = response.providers || [];
+    const names = [];
+    for (const provider of providers) {
+      const models = provider.models || provider.availableModels || [];
+      const list = Array.isArray(models) ? models : Object.keys(models);
+      for (const model of list) {
+        const id = typeof model === 'string' ? model : (model.id || model.name);
+        if (id) names.push(`${provider.id || provider.name}/${id}`);
+      }
+    }
+    let datalist = document.getElementById('opencodeModelList');
+    if (!datalist) {
+      datalist = document.createElement('datalist');
+      datalist.id = 'opencodeModelList';
+      document.body.appendChild(datalist);
+      document.getElementById('opencodeModel').setAttribute('list', 'opencodeModelList');
+    }
+    datalist.innerHTML = '';
+    names.slice(0, 200).forEach(name => {
+      const option = document.createElement('option');
+      option.value = name;
+      datalist.appendChild(option);
+    });
+    const modelInput = document.getElementById('opencodeModel');
+    if (!modelInput.value.trim() && response.defaults) {
+      const firstKey = Object.keys(response.defaults)[0];
+      if (firstKey && response.defaults[firstKey]) {
+        modelInput.value = `${firstKey}/${response.defaults[firstKey]}`;
+      }
+    }
+    status.textContent = names.length > 0
+      ? `${names.length} models available. Pick from the dropdown.`
+      : 'Connected, but no models listed. Type provider/model manually.';
+  } catch (error) {
+    status.textContent = `Failed: ${error.message}`;
+  } finally {
+    button.disabled = false;
+  }
 }
 
 async function loadProfile() {
@@ -97,6 +199,19 @@ function setupEventListeners() {
     const input = document.getElementById('githubToken');
     input.type = input.type === 'password' ? 'text' : 'password';
   });
+
+  document.getElementById('toggleOpencodePassword').addEventListener('click', () => {
+    const input = document.getElementById('opencodePassword');
+    input.type = input.type === 'password' ? 'text' : 'password';
+  });
+
+  document.querySelectorAll('input[name="llmProvider"]').forEach(radio => {
+    radio.addEventListener('change', updateProviderVisibility);
+  });
+
+  document.getElementById('testOpencode').addEventListener('click', testOpencodeConnection);
+  document.getElementById('refreshModels').addEventListener('click', refreshOpenCodeModels);
+  document.getElementById('scanResume').addEventListener('click', scanResumeFill);
 
   document.getElementById('addProject').addEventListener('click', addProject);
   document.getElementById('addLink').addEventListener('click', addOtherLink);
@@ -523,6 +638,134 @@ function clearResume() {
   resumeCleared = true;
 }
 
+// === Resume Scan (fill profile from resume, safe review) ===
+
+async function scanResumeFill() {
+  const button = document.getElementById('scanResume');
+  const report = document.getElementById('resumeScanReport');
+  button.disabled = true;
+  button.textContent = 'Scanning...';
+  report.textContent = '';
+
+  try {
+    let resumeText = document.getElementById('resumeFile').dataset.text || '';
+    if (!resumeText) {
+      const profile = await browser.runtime.sendMessage({ action: 'getProfile' });
+      resumeText = (profile && profile.resumeText) || '';
+    }
+    if (!resumeText.trim()) {
+      throw new Error('Upload a resume first, then scan.');
+    }
+
+    const response = await browser.runtime.sendMessage({ action: 'parseResume', data: { resumeText } });
+    if (!response || !response.success) {
+      throw new Error((response && response.error) || 'Scan failed.');
+    }
+
+    const summary = applyExtractedReview(response.extracted || {});
+    const bits = [`Filled ${summary.filled} field${summary.filled === 1 ? '' : 's'}`];
+    if (summary.conflicts.length > 0) {
+      bits.push(`conflicts kept as-is: ${summary.conflicts.join(', ')}`);
+    }
+    if (summary.skipped > 0) {
+      bits.push(`${summary.skipped} not found in resume`);
+    }
+    report.textContent = bits.join('. ') + '. Review above, then click Save.';
+    showStatus('Resume scanned. Review the highlighted fields, then Save.');
+  } catch (error) {
+    report.textContent = `Scan failed: ${error.message}`;
+  } finally {
+    button.disabled = false;
+    button.textContent = 'Scan Resume & Fill Profile';
+  }
+}
+
+function markScanned(input, isNew) {
+  input.style.border = isNew ? '2px solid #4caf50' : '2px solid #ff9800';
+  input.title = isNew ? 'Filled from resume' : 'Resume has a different value; kept yours';
+}
+
+function applyTextField(inputId, value, summary) {
+  if (!value) {
+    summary.skipped++;
+    return;
+  }
+  const input = document.getElementById(inputId);
+  if (!input) return;
+  const current = input.value.trim();
+  if (!current) {
+    input.value = value;
+    markScanned(input, true);
+    summary.filled++;
+  } else if (current.toLowerCase() !== value.toLowerCase()) {
+    markScanned(input, false);
+    summary.conflicts.push(inputId);
+  }
+}
+
+function applyExtractedReview(extracted) {
+  const summary = { filled: 0, conflicts: [], skipped: 0 };
+
+  applyTextField('firstName', extracted.firstName, summary);
+  applyTextField('middleName', extracted.middleName, summary);
+  applyTextField('lastName', extracted.lastName, summary);
+  applyTextField('email', extracted.email, summary);
+  applyTextField('phone', extracted.phone, summary);
+  applyTextField('githubUsername', extracted.githubUsername, summary);
+  applyTextField('linkedinUrl', extracted.linkedinUrl, summary);
+  applyTextField('twitterUrl', extracted.twitterUrl, summary);
+  applyTextField('portfolioUrl', extracted.portfolioUrl, summary);
+
+  const linkLists = [
+    { items: extracted.otherLinks, get: getOtherLinksFromDOM, render: renderOtherLinksList },
+    { items: extracted.deployedProjects, get: getProjectsFromDOM, render: renderProjectList }
+  ];
+  for (const list of linkLists) {
+    if (Array.isArray(list.items) && list.items.length > 0) {
+      const current = list.get();
+      const have = new Set(current.map(item => (item.url || '').toLowerCase()));
+      const fresh = list.items.filter(item => item.url && !have.has(item.url.toLowerCase()));
+      if (fresh.length > 0) {
+        list.render([...current, ...fresh]);
+        summary.filled += fresh.length;
+      }
+    }
+  }
+
+  const contextLists = [
+    { id: 'researchPapersList', items: extracted.researchPapers },
+    { id: 'certificationsList', items: extracted.certifications },
+    { id: 'achievementsList', items: extracted.achievements }
+  ];
+  for (const list of contextLists) {
+    if (Array.isArray(list.items) && list.items.length > 0) {
+      const current = getContextListFromDOM(list.id);
+      const have = new Set(current.map(item => (item.title || '').toLowerCase()));
+      const fresh = list.items.filter(item => item.title && !have.has(item.title.toLowerCase()));
+      if (fresh.length > 0) {
+        renderContextList(list.id, [...current, ...fresh]);
+        summary.filled += fresh.length;
+      }
+    }
+  }
+
+  if (extracted.otherContext) {
+    const input = document.getElementById('otherContext');
+    if (input && !input.value.trim()) {
+      input.value = extracted.otherContext;
+      markScanned(input, true);
+      summary.filled++;
+    } else if (input && input.value.trim().toLowerCase() !== extracted.otherContext.toLowerCase()) {
+      markScanned(input, false);
+      summary.conflicts.push('otherContext');
+    }
+  } else {
+    summary.skipped++;
+  }
+
+  return summary;
+}
+
 // === Cache ===
 
 async function refreshCache() {
@@ -604,17 +847,31 @@ async function saveAllSettings() {
 
   try {
     const existingProfile = await browser.runtime.sendMessage({ action: 'getProfile' });
+    const existingSettings = await browser.runtime.sendMessage({ action: 'getSettings' });
     const oldGithubUsername = existingProfile?.githubUsername;
     const newGithubUsername = document.getElementById('githubUsername').value.trim();
+
+    const passwordInput = document.getElementById('opencodePassword').value;
+    const fallbacks = document.getElementById('opencodeFallbacks').value
+      .split('\n')
+      .map(line => line.trim())
+      .filter(Boolean);
 
     await browser.runtime.sendMessage({
       action: 'saveSettings',
       data: {
         groqApiKey: document.getElementById('apiKey').value.trim(),
         githubToken: document.getElementById('githubToken').value.trim(),
-        historyRetentionDays: parseInt(document.getElementById('historyRetention').value) || 90
+        historyRetentionDays: parseInt(document.getElementById('historyRetention').value) || 90,
+        llmProvider: document.getElementById('providerOpencode').checked ? 'opencode' : 'groq',
+        opencodeBaseUrl: document.getElementById('opencodeBaseUrl').value.trim() || 'http://127.0.0.1:4096',
+        opencodeUsername: document.getElementById('opencodeUsername').value.trim() || 'opencode',
+        opencodePassword: passwordInput ? passwordInput : (existingSettings?.opencodePassword || ''),
+        opencodeModel: document.getElementById('opencodeModel').value.trim(),
+        opencodeFallbacks: fallbacks
       }
     });
+    document.getElementById('opencodePassword').value = '';
 
     const resumeFileInput = document.getElementById('resumeFile');
     const additionalContext = getAdditionalContextFromProfile();
@@ -712,6 +969,7 @@ async function exportAllData() {
     const exportSettings = { ...settings };
     delete exportSettings.groqApiKey;
     delete exportSettings.githubToken;
+    delete exportSettings.opencodePassword;
 
     const data = {
       version: 1,

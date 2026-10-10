@@ -18,7 +18,9 @@
     "storage",
     "activeTab",
     "https://api.groq.com/*",
-    "https://api.github.com/*"
+    "https://api.github.com/*",
+    "http://127.0.0.1/*",
+    "http://localhost/*"
   ],
   "browser_action": {
     "default_icon": {

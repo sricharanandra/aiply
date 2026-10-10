@@ -13,10 +13,17 @@
       <p class="subtitle">Configure your profile for personalized job application answers</p>
     </header>
 
-    <!-- API Setup -->
+    <!-- AI Provider -->
     <section class="section">
-      <h2>API Setup</h2>
+      <h2>AI Provider</h2>
       <div class="field">
+        <label>Provider</label>
+        <div class="field-row">
+          <label><input type="radio" name="llmProvider" id="providerGroq" value="groq"> Groq API</label>
+          <label><input type="radio" name="llmProvider" id="providerOpencode" value="opencode"> OpenCode (local)</label>
+        </div>
+      </div>
+      <div class="field" id="groqFields">
         <label for="apiKey">Groq API Key</label>
         <div class="input-group">
           <input type="password" id="apiKey" placeholder="gsk_...">
@@ -26,6 +33,42 @@
           Get your free API key at 
           <a href="https://console.groq.com/keys" target="_blank" rel="noopener noreferrer">console.groq.com/keys</a>
         </p>
+      </div>
+      <div id="opencodeFields" style="display: none;">
+        <div class="field">
+          <label for="opencodeBaseUrl">Server URL</label>
+          <input type="text" id="opencodeBaseUrl" placeholder="http://127.0.0.1:4096">
+          <p class="hint">Start it with: <code>opencode serve --port 4096</code>. If port 4096 is taken on your machine, serve on another port and paste that URL here. Nothing is ever killed.</p>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label for="opencodeUsername">Username <span class="optional">(only if password set)</span></label>
+            <input type="text" id="opencodeUsername" placeholder="opencode">
+          </div>
+          <div class="field">
+            <label for="opencodePassword">Password <span class="optional">(only if set)</span></label>
+            <div class="input-group">
+              <input type="password" id="opencodePassword" placeholder="OPENCODE_SERVER_PASSWORD">
+              <button type="button" id="toggleOpencodePassword" class="btn-icon" title="Show/hide">👁</button>
+            </div>
+          </div>
+        </div>
+        <div class="field">
+          <label for="opencodeModel">Model <span class="optional">(provider/model)</span></label>
+          <div class="input-group">
+            <input type="text" id="opencodeModel" placeholder="opencode/big-pickle">
+            <button type="button" id="refreshModels" class="btn-secondary" title="List models from server">Refresh</button>
+          </div>
+          <p class="hint">Free Zen models change often. Refresh lists what your server offers right now, then pick.</p>
+        </div>
+        <div class="field">
+          <label for="opencodeFallbacks">Fallback models <span class="optional">(one per line, tried in order)</span></label>
+          <textarea id="opencodeFallbacks" rows="2" placeholder="anthropic/claude-sonnet-4&#10;opencode/big-pickle"></textarea>
+        </div>
+        <div class="field">
+          <button type="button" id="testOpencode" class="btn-secondary">Test Connection</button>
+          <span id="opencodeStatus" class="hint"></span>
+        </div>
       </div>
     </section>
 
@@ -143,6 +186,11 @@
       <div class="field" id="resumePreviewContainer" style="display: none;">
         <label>Resume Preview</label>
         <textarea id="resumePreview" readonly rows="10"></textarea>
+      </div>
+      <div class="field">
+        <button type="button" id="scanResume" class="btn-secondary">Scan Resume & Fill Profile</button>
+        <p class="hint">Fills empty fields from the loaded resume. Existing values are never overwritten; conflicts are flagged for review. Nothing is saved until you click Save.</p>
+        <div id="resumeScanReport" class="hint"></div>
       </div>
     </section>
 
